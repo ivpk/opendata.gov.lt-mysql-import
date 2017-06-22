@@ -121,19 +121,23 @@ def test_me(app, db):
     # Try to update changes on existing dataase.
     sync.sync_datasets()
 
+    # Packages.
     packages = [ckanapi.package_show(id=x) for x in ckanapi.package_list()]
     assert [(x['title'],) for x in packages] == [
         ('Adresų registras',),
     ]
 
+    # Tags.
     tags = ckanapi.package_show(id='adresu-registras')['tags']
     assert sorted([x['name'] for x in tags]) == ['administraciniai vienetai', 'adresas']
 
+    # Users.
     assert [(x['name'], x['fullname']) for x in ckanapi.user_list()] == [
         ('importbot', None),
         ('vardenis', 'Vardenis Pavardenis'),
     ]
 
+    # Organizations.
     organizations = [ckanapi.organization_show(id=x) for x in ckanapi.organization_list()]
     assert [(x['title'],) for x in organizations] == [
         ('VĮ Registrų centras',)

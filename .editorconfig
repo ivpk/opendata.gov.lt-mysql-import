@@ -1,0 +1,13 @@
+# https://github.com/editorconfig/editorconfig/wiki/EditorConfig-Properties
+
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+
+[*.py]
+charset = utf-8
+indent_stype = space
+indent_size = 4
+max_line_length = 120

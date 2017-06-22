@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import re
 import string
 import logging
+import logging.config
 
 import unidecode
 import sqlalchemy as sa
@@ -15,6 +16,24 @@ from ckan.logic import NotFound
 
 
 logger = logging.getLogger(__name__)
+
+
+def configure_logging(config):
+    logging.config.dictConfig(config)
+    for logger in map(logging.getLogger, config['loggers'].keys()):
+        logger.disabled = 0
+
+
+def dump_loggers():
+    for name, logger in [('root', logging.root)] + logging.Logger.manager.loggerDict.items():
+        if getattr(logger, 'handlers', None):
+            print('%s: (level=%s, disabled=%r)' % (name, logging.getLevelName(logger.level), logger.disabled))
+            for handler in logger.handlers:
+                print('   %s.%s (level=%s)' % (
+                    handler.__class__.__module__,
+                    handler.__class__.__name__,
+                    logging.getLevelName(handler.level),
+                ))
 
 
 def slugify(title=None, length=100):
@@ -210,6 +229,8 @@ class CkanSync(object):
                 existing_datasets[int(import_source_id)] = ds
 
         for row in self.execute(sa.select([self.t.rinkmena])):
+            logger.debug('sync package: %s', row.PAVADINIMAS)
+
             user = self.sync_user(row.USER_ID)
             organization = self.sync_organization(row.istaiga_id)
             self.api.organization_member_create(
@@ -268,25 +289,55 @@ class OpenDataGovLtCommand(toolkit.CkanCommand):
 
     Usage:
 
-        paster --plugin=odgovlt-mysql-import odgovltsync -c ../deployment/ckan/development.ini
+        paster --plugin=odgovlt-mysql-import odgovltsync -c ../deployment/ckan/development.ini -l debug
 
     """
 
     summary = __doc__.splitlines()[0]
     usage = __doc__
 
+    def __init__(self, name):
+        super(OpenDataGovLtCommand, self).__init__(name)
+
+        self.parser.add_option('-l', '--level', dest='loglevel', default='info',
+                               help='Sel log level')
+
     def command(self):
         self._load_config()
 
-        logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
+        configure_logging({
+            'formatters': {
+                'default': {
+                    'format': '%(asctime)s %(levelname)7s %(name)s: %(message)s',
+                    'datefmt': '%Y-%m-%d %H:%M:%S',
+                },
+            },
+            'handlers': {
+                'stderr': {
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'default',
+                },
+            },
+            'loggers': {
+                '': {
+                    'handlers': [],
+                },
+                logger.name: {
+                    'level': self.options.loglevel.upper(),
+                    'handlers': ['stderr'],
+                },
+            },
+            'version': 1,
+        })
 
-        ckanapi = CkanAPI()
-        print(ckanapi.status_show())
-
+        logger.info('connecting to opendata.gov.lt database')
         engine = sa.create_engine('mysql+pymysql://sirex:@localhost/rinkmenos?charset=utf8')
         db = sa.MetaData()
         db.reflect(bind=engine)
         conn = engine.connect()
 
+        ckanapi = CkanAPI()
         sync = CkanSync(ckanapi, db, conn)
+        logger.info('synchronisation started')
         sync.sync_datasets()
+        logger.info('synchronisation ended')
