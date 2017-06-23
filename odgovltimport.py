@@ -251,8 +251,7 @@ class CkanSync(object):
 
         query = (
             sa.select([self.t.rinkmena]).
-            where(self.t.rinkmena.c.STATUSAS == 'U').
-            where(self.t.rinkmena.c.ID == 1051)
+            where(self.t.rinkmena.c.STATUSAS == 'U')
         )
         for row in self.execute(query):
             logger.info('sync package: %s', row.PAVADINIMAS)
