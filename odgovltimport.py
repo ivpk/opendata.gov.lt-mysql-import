@@ -15,6 +15,7 @@ import sqlalchemy as sa
 
 from ckan.plugins import toolkit
 from ckan.logic import NotFound
+from ckan.common import config
 
 
 logger = logging.getLogger(__name__)
@@ -339,7 +340,17 @@ class OpenDataGovLtCommand(toolkit.CkanCommand):
 
     Usage:
 
+    In forder for this to work, add this configuration parameter to ckan ini file, [app:main] section:
+
+        odgovltimport.externaldb.url = mysql+pymysql://sirex:@localhost/rinkmenos?charset=utf8
+
+    Then locally you can run the import like this:
+
         paster --plugin=odgovlt-mysql-import odgovltsync -c ../deployment/ckan/development.ini -l debug
+
+    In production command should look something like this:
+
+        paster --plugin=odgovlt-mysql-import odgovltsync -c /etc/ckan/default/production.ini
 
     """
 
@@ -380,8 +391,8 @@ class OpenDataGovLtCommand(toolkit.CkanCommand):
             'version': 1,
         })
 
-        logger.info('connecting to opendata.gov.lt database')
-        engine = sa.create_engine('mysql+pymysql://sirex:@localhost/rinkmenos?charset=utf8')
+        logger.info('connecting to external opendata.gov.lt database')
+        engine = sa.create_engine(config['odgovltimport.externaldb.url'])
         db = sa.MetaData()
         db.reflect(bind=engine)
         conn = engine.connect()
