@@ -2,11 +2,13 @@
 
 from __future__ import print_function
 from __future__ import unicode_literals
+from __future__ import division
 
 import re
 import string
 import logging
 import logging.config
+import itertools
 
 import unidecode
 import sqlalchemy as sa
@@ -36,7 +38,7 @@ def dump_loggers():
                 ))
 
 
-def slugify(title=None, length=100):
+def slugify(title=None, length=90):
     if not title:
         return ''
 
@@ -48,21 +50,26 @@ def slugify(title=None, length=100):
     slug = re.sub(r'[-\s]+', '-', slug)
 
     # Make sure, that slug is not longer that specied in `length`.
-    begining_chars = length // 5
     if len(slug) > length:
+        left = []
+        right = []
         words = slug.split('-')
-        a, b = [], []
-        while words and len('-'.join(a + b)) < length:
-            if len('-'.join(a)) <= (len('-'.join(b)) + begining_chars):
-                a.append(words.pop(0))
+        split = int(len(words) * .6)
+        index = itertools.izip_longest(
+            ((i, left) for i in range(split)),
+            ((i, right) for i in range(len(words) - 1, split - 1, -1)),
+        )
+        index = (i for i in itertools.chain.from_iterable(index) if i is not None)
+        total = 0
+        for k, (i, q) in zip(itertools.chain([0], itertools.count(2)), index):
+            if total + len(words[i]) + k > length:
+                break
             else:
-                b.insert(0, words.pop())
-        if b:
-            slug = '-'.join(a) + '--' + '-'.join(b)
-        else:
-            slug = '-'.join(a)
+                q.append(words[i])
+                total += len(words[i])
+        slug = '-'.join(left) + '--' + '-'.join(right)
 
-    return slug[:length + begining_chars]
+    return slug
 
 
 def tagify(tag):
@@ -77,6 +84,15 @@ def fixcase(value):
         return value
 
 
+def find_unique_name(names, name):
+    unique = name
+    counter = itertools.count()
+    while unique in names:
+        unique = '%s-%d' % (name, next(counter))
+    names.add(unique)
+    return unique
+
+
 class CkanAPI(object):
     """Wrapper around CKAN API actions.
 
@@ -87,7 +103,7 @@ class CkanAPI(object):
         return lambda context={}, **kwargs: toolkit.get_action(name)(context, kwargs)
 
 
-SOURCE_ID_KEY = 'Šaltinio ID'
+SOURCE_ID_KEY = 'Išorinis ID'
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
 
@@ -118,6 +134,7 @@ class CkanSync(object):
             user = db.tables['t_user']
             istaiga = db.tables['t_istaiga']
             rinkmena = db.tables['t_rinkmena']
+            rinkmenu_logas = db.tables['t_rinkmenu_logas']
 
         self.t = Tables
 
@@ -145,7 +162,7 @@ class CkanSync(object):
 
         if user:
             user_data = {
-                'name': user.LOGIN,
+                'name': slugify(user.LOGIN),
                 # TODO: Passwrods are encoded with md5 hash, I need to look if
                 #       CKAN supports md5 hashed passwords. If not, then users will
                 #       have to change their passwords.
@@ -221,15 +238,23 @@ class CkanSync(object):
         return organization_data
 
     def sync_datasets(self):
+        taken_names = set()
         existing_datasets = {}
+        logger.info('fetch existing datasets')
         for name in self.api.package_list():
+            taken_names.add(name)
             ds = self.api.package_show(id=name)
             import_source_id = next((x['value'] for x in ds['extras'] if x['key'] == SOURCE_ID_KEY), None)
             if import_source_id:
-                existing_datasets[int(import_source_id)] = ds
+                existing_datasets[int(import_source_id)] = ds['name']
 
-        for row in self.execute(sa.select([self.t.rinkmena])):
-            logger.debug('sync package: %s', row.PAVADINIMAS)
+        query = (
+            sa.select([self.t.rinkmena]).
+            where(self.t.rinkmena.c.STATUSAS == 'U').
+            where(self.t.rinkmena.c.ID == 1051)
+        )
+        for row in self.execute(query):
+            logger.info('sync package: %s', row.PAVADINIMAS)
 
             user = self.sync_user(row.USER_ID)
             organization = self.sync_organization(row.istaiga_id)
@@ -244,44 +269,69 @@ class CkanSync(object):
                 'user': user['name'],
             }
 
+            package = {
+                # PAVADINIMAS
+                'title': row.PAVADINIMAS,
+
+                # SANTRAUKA
+                'notes': row.SANTRAUKA,
+
+                # TINKLAPIS
+                'url': row.TINKLAPIS,
+
+                # USER_ID
+                'maintainer': user['fullname'],
+
+                # K_EMAIL
+                'maintainer_email': row.K_EMAIL,
+
+                # istaiga_id
+                'owner_org': organization['name'],
+
+                # R_ZODZIAI
+                'tags': list(get_package_tags(row.R_ZODZIAI)),
+
+                'private': row.STATUSAS != 'U',
+                'state': 'active',
+                'type': 'dataset',
+
+                'extras': [
+                    # ID
+                    {'key': SOURCE_ID_KEY, 'value': row.ID},
+
+                    # KODAS
+                    {'key': CODE_KEY, 'value': row.KODAS},
+                ],
+            }
+
             if row.ID not in existing_datasets:
-                self.api.package_create(
-                    context,
+                name = find_unique_name(taken_names, slugify(row.PAVADINIMAS))
 
-                    # PAVADINIMAS
-                    name=slugify(row.PAVADINIMAS),
-                    title=row.PAVADINIMAS,
+                if name == '':
+                    logger.warn('skip package with an empty name, package id: %s, code: %s', row.ID, row.KODAS)
+                    continue
 
-                    # SANTRAUKA
-                    notes=row.SANTRAUKA,
+                created, modified = self.execute(
+                    sa.select([
+                        sa.func.min(self.t.rinkmenu_logas.c.DATA),
+                        sa.func.max(self.t.rinkmenu_logas.c.DATA),
+                    ]).
+                    where(self.t.rinkmenu_logas.c.RINKMENOS_ID == row.ID)
+                ).fetchone()
 
-                    # TINKLAPIS
-                    url=row.TINKLAPIS,
+                package.update({
+                    'name': name,
+                    'metadata_created': created,
+                    'metadata_modified': modified,
+                })
 
-                    # USER_ID
-                    maintainer=user['fullname'],
-
-                    # K_EMAIL
-                    maintainer_email=row.K_EMAIL,
-
-                    # istaiga_id
-                    owner_org=organization['name'],
-
-                    # R_ZODZIAI
-                    tags=list(get_package_tags(row.R_ZODZIAI)),
-
-                    private=False,
-                    state='active',
-                    type='dataset',
-
-                    extras=[
-                        # ID
-                        {'key': SOURCE_ID_KEY, 'value': row.ID},
-
-                        # KODAS
-                        {'key': CODE_KEY, 'value': row.KODAS},
-                    ],
-                )
+                logger.debug('create new package: %s', name)
+                self.api.package_create(context, **package)
+            else:
+                logger.debug('update existing package: %s (external id: %s)', existing_datasets[row.ID], row.ID)
+                ds = self.api.package_show(id=existing_datasets[row.ID])
+                ds.update(package)
+                self.api.package_update(context, **ds)
 
 
 class OpenDataGovLtCommand(toolkit.CkanCommand):
@@ -305,6 +355,7 @@ class OpenDataGovLtCommand(toolkit.CkanCommand):
     def command(self):
         self._load_config()
 
+        log_level = self.options.loglevel.upper()
         configure_logging({
             'formatters': {
                 'default': {
@@ -319,13 +370,12 @@ class OpenDataGovLtCommand(toolkit.CkanCommand):
                 },
             },
             'loggers': {
-                '': {
-                    'handlers': [],
-                },
-                logger.name: {
-                    'level': self.options.loglevel.upper(),
-                    'handlers': ['stderr'],
-                },
+                '': {'handlers': []},
+                logger.name: {'level': log_level, 'handlers': ['stderr']},
+                'ckan.logic.action.create': {'level': log_level, 'handlers': ['stderr']},
+                'ckan.logic.action.delete': {'level': log_level, 'handlers': ['stderr']},
+                'ckan.logic.action.patch':  {'level': log_level, 'handlers': ['stderr']},  # noqa
+                'ckan.logic.action.update': {'level': log_level, 'handlers': ['stderr']},
             },
             'version': 1,
         })
