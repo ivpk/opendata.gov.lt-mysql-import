@@ -17,4 +17,10 @@ setup(
         'sqlalchemy',
         'PyMySQL',
     ],
+    extras_require={
+        'tests': [
+            'pytest',
+            'pytest-catchlog',
+        ]
+    },
 )
