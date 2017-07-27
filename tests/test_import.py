@@ -108,6 +108,7 @@ def test_me(app, db):
             'PAVADINIMAS': 'Adresų registras',
             'SANTRAUKA': 'Gatvių ir adresų duomenys.',
             'R_ZODZIAI': 'adresas, administraciniai vienetai',
+            'STATUSAS': 'U',
         },
     ])
 
