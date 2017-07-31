@@ -238,6 +238,9 @@ class CkanSync(object):
 
         return organization_data
 
+    def sync_group(self, group_id):
+        pass
+
     def sync_datasets(self):
         taken_names = set()
         existing_datasets = {}

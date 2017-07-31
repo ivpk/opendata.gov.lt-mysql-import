@@ -83,7 +83,7 @@ def db():
     return collections.namedtuple('DB', ('engine', 'metadata'))(engine, db)
 
 
-def test_me(app, db):
+def test_sync(app, db):
     conn = db.engine.connect()
 
     user_id, = conn.execute(db.metadata.tables['t_user'].insert(), {
@@ -101,14 +101,61 @@ def test_me(app, db):
         'ADRESAS': 'Adreso g., Vilnius',
     }).inserted_primary_key
 
-    conn.execute(db.metadata.tables['t_rinkmena'].insert(), [
+    rinkmenos = {}
+    rinkmenos['Adresų registras'], = conn.execute(db.metadata.tables['t_rinkmena'].insert(), {
+        'USER_ID': user_id,
+        'istaiga_id': organization_id,
+        'PAVADINIMAS': 'Adresų registras',
+        'SANTRAUKA': 'Gatvių ir adresų duomenys.',
+        'R_ZODZIAI': 'adresas, administraciniai vienetai',
+        'STATUSAS': 'U',
+    }).inserted_primary_key
+
+    kategorijos = {}
+    # |-- Ūkinė veikla ir verslas
+    # |   `-- Gyventojai
+    # `-- Transportas ir ryšiai
+    #     `-- Komunikacija
+    #         `-- Gatvės
+
+    kategorijos['Ūkinė veikla ir verslas'], = conn.execute(db.metadata.tables['t_kategorija'].insert(), {
+        'PAVADINIMAS': 'Ūkinė veikla ir verslas',
+        'KATEGORIJA_ID': 0,
+        'LYGIS': 1,
+    }).inserted_primary_key
+
+    kategorijos['Transportas ir ryšiai'], = conn.execute(db.metadata.tables['t_kategorija'].insert(), {
+        'PAVADINIMAS': 'Transportas ir ryšiai',
+        'KATEGORIJA_ID': 0,
+        'LYGIS': 1,
+    }).inserted_primary_key
+
+    kategorijos['Komunikacija'], = conn.execute(db.metadata.tables['t_kategorija'].insert(), {
+        'PAVADINIMAS': 'Komunikacija',
+        'KATEGORIJA_ID': kategorijos['Transportas ir ryšiai'],
+        'LYGIS': 2,
+    }).inserted_primary_key
+
+    kategorijos['Gatvės'], = conn.execute(db.metadata.tables['t_kategorija'].insert(), {
+        'PAVADINIMAS': 'Gatvės',
+        'KATEGORIJA_ID': kategorijos['Komunikacija'],
+        'LYGIS': 3,
+    }).inserted_primary_key
+
+    kategorijos['Gyventojai'], = conn.execute(db.metadata.tables['t_kategorija'].insert(), {
+        'PAVADINIMAS': 'Gyventojai',
+        'KATEGORIJA_ID': kategorijos['Ūkinė veikla ir verslas'],
+        'LYGIS': 2,
+    }).inserted_primary_key
+
+    conn.execute(db.metadata.tables['t_kategorija_rinkmena'].insert(), [
         {
-            'USER_ID': user_id,
-            'istaiga_id': organization_id,
-            'PAVADINIMAS': 'Adresų registras',
-            'SANTRAUKA': 'Gatvių ir adresų duomenys.',
-            'R_ZODZIAI': 'adresas, administraciniai vienetai',
-            'STATUSAS': 'U',
+            'KATEGORIJA_ID': kategorijos['Gyventojai'],
+            'RINKMENOS_ID': rinkmenos['Adresų registras'],
+        },
+        {
+            'KATEGORIJA_ID': kategorijos['Gatvės'],
+            'RINKMENOS_ID': rinkmenos['Adresų registras'],
         },
     ])
 
@@ -142,4 +189,10 @@ def test_me(app, db):
     organizations = [ckanapi.organization_show(id=x) for x in ckanapi.organization_list()]
     assert [(x['title'],) for x in organizations] == [
         ('VĮ Registrų centras',)
+    ]
+
+    # Groups
+    groups = [ckanapi.group_show(id=x) for x in ckanapi.group_list()]
+    assert groups == []
+    assert [(x['title'],) for x in groups] == [
     ]
