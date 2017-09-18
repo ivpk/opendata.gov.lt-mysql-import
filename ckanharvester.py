@@ -10,8 +10,8 @@ from base import HarvesterBase
 
 class CKANHarvester(HarvesterBase):
 
-    def _connect(self, user, password, db, host='192.168.56.101'): 
-    	url = 'mysql://{}:{}@{}/{}'
+    def _connect(self, user, password, db, host='192.168.56.101'):
+    	url = 'mysql://{}:{}@{}/{}?charset=utf8'
     	url = url.format(user, password, host, db)
    	con = create_engine(url)
   	meta = MetaData(bind=con, reflect=True)
@@ -32,8 +32,9 @@ class CKANHarvester(HarvesterBase):
 	clause = results.select()
 	ids = []
 	for row in con.execute(clause):
-	    id = row[0]
-	    obj = HarvestObject(guid=id, job=harvest_job, content='%s,%s' % (row[0], row[2]))
+	    re = results.c
+	    id = row[re.ID]
+	    obj = HarvestObject(guid=id, job=harvest_job, content='%s,%s,%s' % (row[re.ID], row[re.PAVADINIMAS], row[re.SANTRAUKA]))
             obj.save()
             ids.append(obj.id)
 	return ids
@@ -46,6 +47,7 @@ class CKANHarvester(HarvesterBase):
 	package_dict = {
 		'id' : data_to_import[0],
 		'title' : data_to_import[1],
+		'notes' : data_to_import[2],
 		'owner_org' : 'orga'
 	}
         return self._create_or_update_package(package_dict, harvest_object)
