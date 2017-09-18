@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import urllib2
 import httplib
 import datetime
@@ -13,16 +13,9 @@ log = logging.getLogger(__name__)
 
 from base import HarvesterBase
 
-#harvesteris parašytas pakeitus ckan-harvester kodą
-#kol kas harvestina viską kas yra duombazėj.
-#kadangi pas mane nesukonfiguruotas cron tai pats harvesteris automatiškai nepasileidžia
-#norint ckan privesti paleisti harvesti reik rašyti šias komandas esant opendata.gov.lt/ckan
-#paster --plugin=ckanext-harvest harvester gather_consumer vienam terminalo lange ir
-#paster --plugin=ckanext-harvest harvester fetch_consumer kitam terminalo lange
-
 class CKANHarvester(HarvesterBase):
 
-    def _connect(self, user, password, db, host='192.168.56.101'): #host: duombazės ip
+    def _connect(self, user, password, db, host='192.168.56.101'): 
     	url = 'mysql://{}:{}@{}/{}'
     	url = url.format(user, password, host, db)
    	con = create_engine(url)
@@ -39,8 +32,8 @@ class CKANHarvester(HarvesterBase):
 
     def gather_stage(self, harvest_job):
         log.debug('In opendatagov gather_stage')
-        con, meta = self._connect('root', 'root', 'opendatagov') #root: laukeliuose jūsų duombazės user ir pass, o
-	results = meta.tables['t_rinkmena']			 #opendatagov: laukelyje duombazės pavadinimas
+        con, meta = self._connect('root', 'root', 'opendatagov') 
+	results = meta.tables['t_rinkmena']			 
 	clause = results.select()
 	ids = []
 	for row in con.execute(clause):

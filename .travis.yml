@@ -2,7 +2,7 @@ language: python
 python:
   - "2.7"
 install:
-  - pip install flake8 docutils
+  - pip install flake8 docutils rst2html
 script:
   - flake8 ckanharvester.py
   - rst2html --strict README.rst /dev/null
