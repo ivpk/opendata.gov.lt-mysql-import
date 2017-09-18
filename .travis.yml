@@ -5,4 +5,4 @@ install:
   - pip install flake8 docutils
 script:
   - flake8 ckanharvester.py
-  - rst2html --strict README.rst /dev/null
+  - rst2html.py --strict README.rst /dev/null
