@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
-import urllib2
-import httplib
-import datetime
-import socket
 from sqlalchemy import create_engine
-from sqlalchemy import text
-from sqlalchemy import Table, MetaData
-from ckanext.harvest.model import HarvestJob, HarvestObject, HarvestGatherError
+from sqlalchemy import MetaData
+from ckanext.harvest.model import HarvestObject
 import logging
 
 log = logging.getLogger(__name__)
