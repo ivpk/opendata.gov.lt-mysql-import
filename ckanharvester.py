@@ -27,20 +27,20 @@ class CKANHarvester(HarvesterBase):
 
     def gather_stage(self, harvest_job):
         log.debug('In opendatagov gather_stage')
-        con, meta = self._connect('root', 'root', 'opendatagov') 
-        results = meta.tables['t_rinkmena']			 
+        con, meta = self._connect('root', 'root', 'opendatagov')
+        results = meta.tables['t_rinkmena']
         clause = results.select()
         ids = []
         for row in con.execute(clause):
             re = results.c
             id = row[re.ID]
             obj = HarvestObject(
-                  guid=id, 
-                  job=harvest_job, 
-                  content='%s,%s,%s' % 
+                  guid=id,
+                  job=harvest_job,
+                  content='%s,%s,%s' %
                   (
-                      row[re.ID], 
-                      row[re.PAVADINIMAS], 
+                      row[re.ID],
+                      row[re.PAVADINIMAS],
                       row[re.SANTRAUKA]
                   ))
             obj.save()
