@@ -7,16 +7,17 @@ import logging
 from base import HarvesterBase
 from ckan.common import config
 import json
+from datetime import datetime
 
 log = logging.getLogger(__name__)
 
 
 class DatetimeEncoder(json.JSONEncoder):
     def default(self, obj):
-        try:
-            return super(DatetimeEncoder, obj).default(obj)
-        except TypeError:
+        if isinstance(obj, datetime):
             return str(obj)
+        else:
+            return super().default(obj)
 
 
 class ODGovLt(HarvesterBase):
