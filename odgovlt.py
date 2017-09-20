@@ -11,6 +11,14 @@ import json
 log = logging.getLogger(__name__)
 
 
+class DatetimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return super(DatetimeEncoder, obj).default(obj)
+        except TypeError:
+            return str(obj)
+
+
 class ODGovLt(HarvesterBase):
     def _connect_to_database(self):
         con = create_engine(config['odgovltimport.externaldb.url'])
@@ -37,15 +45,12 @@ class ODGovLt(HarvesterBase):
         database_data = dict()
         for row in con.execute(clause):
             for row_name in row.keys():
-                if type(row[row_name]).__name__ != 'unicode':
-                    database_data[row_name] = str(row[row_name])
-                else:
-                    database_data[row_name] = row[row_name]
+                database_data[row_name] = row[row_name]
             id = database_data['ID']
             obj = HarvestObject(
                   guid=id,
                   job=harvest_job,
-                  content=json.dumps(database_data))
+                  content=json.dumps(database_data, cls=DatetimeEncoder))
             obj.save()
             ids.append(obj.id)
         return ids
@@ -56,7 +61,7 @@ class ODGovLt(HarvesterBase):
     def import_stage(self, harvest_object):
         data_to_import = json.loads(harvest_object.content)
         package_dict = {
-                'id': data_to_import['ID'],
+                'id': harvest_object.guid,
                 'title': data_to_import['PAVADINIMAS'],
                 'notes': data_to_import['SANTRAUKA'],
                 'owner_org': 'orga'
