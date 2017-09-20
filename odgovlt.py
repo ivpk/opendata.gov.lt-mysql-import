@@ -6,6 +6,7 @@ from ckanext.harvest.model import HarvestObject
 import logging
 from base import HarvesterBase
 from ckan.common import config
+import json
 
 log = logging.getLogger(__name__)
 
@@ -33,18 +34,18 @@ class ODGovLt(HarvesterBase):
 
         clause = Tables.rinkmena.select()
         ids = []
+        database_data = dict()
         for row in con.execute(clause):
-            re = Tables.rinkmena.c
-            id = row[re.ID]
+            for row_name in row.keys():
+                if type(row[row_name]).__name__ != 'unicode':
+                    database_data[row_name] = str(row[row_name])
+                else:
+                    database_data[row_name] = row[row_name]
+            id = database_data['ID']
             obj = HarvestObject(
                   guid=id,
                   job=harvest_job,
-                  content='%s,%s,%s' %
-                  (
-                      row[re.ID],
-                      row[re.PAVADINIMAS],
-                      row[re.SANTRAUKA]
-                  ))
+                  content=json.dumps(database_data))
             obj.save()
             ids.append(obj.id)
         return ids
@@ -53,11 +54,11 @@ class ODGovLt(HarvesterBase):
         return True
 
     def import_stage(self, harvest_object):
-        data_to_import = harvest_object.content.split(',')
+        data_to_import = json.loads(harvest_object.content)
         package_dict = {
-                'id': data_to_import[0],
-                'title': data_to_import[1],
-                'notes': data_to_import[2],
+                'id': data_to_import['ID'],
+                'title': data_to_import['PAVADINIMAS'],
+                'notes': data_to_import['SANTRAUKA'],
                 'owner_org': 'orga'
         }
         return self._create_or_update_package(package_dict, harvest_object)
