@@ -15,9 +15,9 @@ log = logging.getLogger(__name__)
 class DatetimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
-            return str(obj)
+            return obj.strftime('%Y-%m-%dT%H:%M:%S')
         else:
-            return super().default(obj)
+            return super(DatetimeEncoder, obj).default(obj)
 
 
 class ODGovLt(HarvesterBase):
@@ -65,6 +65,5 @@ class ODGovLt(HarvesterBase):
                 'id': harvest_object.guid,
                 'title': data_to_import['PAVADINIMAS'],
                 'notes': data_to_import['SANTRAUKA'],
-                'owner_org': 'orga'
-        }
+                'owner_org': 'orga'}
         return self._create_or_update_package(package_dict, harvest_object)
