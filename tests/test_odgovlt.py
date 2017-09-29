@@ -1,8 +1,8 @@
 from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.harvesters.ckanharvester import DatetimeEncoder
-from sqlalchemy import MetaData
-from sqlalchemy.engine.base import Engine
 from datetime import datetime
+import json
+import unicode
 
 
 def test_info():
@@ -15,30 +15,30 @@ def test_info():
     assert isinstance(info['form_config_interface'], str)
 
 
-def test_connect_to_database(mocker):
-    ckan_object = CKANHarvester()
-    config = mocker.patch('ckanext.harvest.harvesters.ckanharvester.config')
-    config.__getitem__.side_effect = 'mysql://test'.split()
-    mocker.patch('ckanext.harvest.harvesters.ckanharvester.MetaData')
-    con, meta = ckan_object._connect_to_database()
-    assert isinstance(con, Engine)
-    mocker.stopall()
-    config = mocker.patch('ckanext.harvest.harvesters.ckanharvester.config')
-    config.__getitem__.side_effect = 'mysql://test'.split()
-    mocker.patch('ckanext.harvest.harvesters.ckanharvester.create_engine')
-    con, meta = ckan_object._connect_to_database()
-    assert isinstance(meta, MetaData)
-
-
-def test_DatetimeEncoder(mocker):
-    datetime_object = DatetimeEncoder()
-    mocker.patch('ckanext.harvest.harvesters.ckanharvester.json.JSONEncoder')
-    mocker.patch('ckanext.harvest.harvesters.ckanharvester.super')
-    date_now = datetime.now()
-    date_1 = date_now.strftime('%Y-%m-%dT%H:%M:%S')
-    date_2 = datetime_object.default(date_now)
-    assert isinstance(date_2, str)
-    assert date_1 == date_2
+def test_DatetimeEncoder():
+    dictionary_data1 = {
+            'test': 'test',
+            'test1': datetime(1977, 2, 19),
+            'test2': 'data',
+            'test3': datetime(3089, 8, 1),
+            'test4': 'name',
+            'test5': 'datetime',
+            'test6': datetime(1900, 9, 30)}
+    dictionary_data2 = {
+            'test': 'test',
+            'test1': datetime(1977, 2, 19).strftime('%Y-%m-%dT%H:%M:%S'),
+            'test2': 'data',
+            'test3': datetime(3089, 8, 1).strftime('%Y-%m-%dT%H:%M:%S'),
+            'test4': 'name',
+            'test5': 'datetime',
+            'test6': datetime(1900, 9, 30).strftime('%Y-%m-%dT%H:%M:%S')}
+    json_data1 = json.dumps(dictionary_data1, cls=DatetimeEncoder)
+    json_data2 = json.dumps(dictionary_data2)
+    dictionary_data3 = json.loads(json_data1)
+    assert isinstance(dictionary_data3['test1'], unicode)
+    assert isinstance(dictionary_data3['test3'], unicode)
+    assert isinstance(dictionary_data3['test6'], unicode)
+    assert json_data1 == json_data2
 
 
 def test_fetch_stage(mocker):
