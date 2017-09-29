@@ -2,7 +2,6 @@ from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.harvesters.ckanharvester import DatetimeEncoder
 from datetime import datetime
 import json
-import unicode
 
 
 def test_info():
@@ -39,6 +38,17 @@ def test_DatetimeEncoder():
     assert isinstance(dictionary_data3['test3'], unicode)
     assert isinstance(dictionary_data3['test6'], unicode)
     assert json_data1 == json_data2
+
+
+def test_gather_stage(mocker):
+    ckan_object = CKANHarvester()
+    HarvestObject = mocker.patch('ckanext.harvest.harvesters.\
+ckanharvester.HarvestObject')
+    config = mocker.patch('ckanext.harvest.harvesters.ckanharvester.config')
+    mocker.patch('ckanext.harvest.harvesters.ckanharvester.create_engine')
+    mocker.patch('ckanext.harvest.harvesters.ckanharvester.MetaData')
+    config.__getitem__.side_effect = 'mysql://test'.split()
+    assert isinstance(ckan_object.gather_stage(HarvestObject), list)
 
 
 def test_fetch_stage(mocker):
