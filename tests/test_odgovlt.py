@@ -2,7 +2,8 @@ from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.harvesters.ckanharvester import DatetimeEncoder
 from datetime import datetime
 import json
-
+from sqlalchemy import create_engine
+from sqlalchemy import MetaData
 
 def test_info():
     ckan_object = CKANHarvester()
@@ -57,12 +58,13 @@ ckanharvester.HarvestObject')
     assert ckan_object.fetch_stage(HarvestObject)
 
 
-def test_import_stage(mocker):
-    ckan_object = CKANHarvester()
-    harvest_object = mocker.patch('ckanext.harvest.harvesters.\
-ckanharvester.HarvestObject')
-    _create_or_update_package = mocker.patch('ckanext.harvest.harvesters.ckanharvester.\
-HarvesterBase._create_or_update_package')
-    mocker.patch('ckanext.harvest.harvesters.ckanharvester.json')
-    ckan_object.import_stage(harvest_object)
-    assert _create_or_update_package.called
+def test_import_stage():
+    con = create_engine('postgresql://ckan_default:OwkOyWpWvGYHYdv\
+LAiQOe7W7DIPGVPpG@localhost/ckan_default')
+    meta = MetaData(bind=con, reflect=True)
+    harvest_object_error = meta.tables['harvest_object_error']
+    clause = harvest_object_error.select()
+    errors = []
+    for row in con.execute(clause):
+        errors.append(row)
+    assert not errors
