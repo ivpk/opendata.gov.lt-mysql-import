@@ -44,10 +44,9 @@ def test_gather_stage(mocker):
     ckan_object = CKANHarvester()
     HarvestObject = mocker.patch('ckanext.harvest.harvesters.\
 ckanharvester.HarvestObject')
-    config = mocker.patch('ckanext.harvest.harvesters.ckanharvester.config')
+    mocker.patch('ckanext.harvest.harvesters.ckanharvester.config')
     mocker.patch('ckanext.harvest.harvesters.ckanharvester.create_engine')
     mocker.patch('ckanext.harvest.harvesters.ckanharvester.MetaData')
-    config.__getitem__.side_effect = 'mysql://test'.split()
     assert isinstance(ckan_object.gather_stage(HarvestObject), list)
 
 
@@ -56,3 +55,14 @@ def test_fetch_stage(mocker):
     HarvestObject = mocker.patch('ckanext.harvest.harvesters.\
 ckanharvester.HarvestObject')
     assert ckan_object.fetch_stage(HarvestObject)
+
+
+def test_import_stage(mocker):
+    ckan_object = CKANHarvester()
+    harvest_object = mocker.patch('ckanext.harvest.harvesters.\
+ckanharvester.HarvestObject')
+    _create_or_update_package = mocker.patch('ckanext.harvest.harvesters.ckanharvester.\
+HarvesterBase._create_or_update_package')
+    mocker.patch('ckanext.harvest.harvesters.ckanharvester.json')
+    ckan_object.import_stage(harvest_object)
+    assert _create_or_update_package.called
