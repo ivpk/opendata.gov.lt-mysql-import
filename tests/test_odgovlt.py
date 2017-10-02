@@ -5,6 +5,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData
 
+
 def test_info():
     ckan_object = CKANHarvester()
     info = ckan_object.info()
