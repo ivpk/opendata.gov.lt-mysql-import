@@ -20,7 +20,7 @@ def was_last_job_considered_error_free():
     last_job = model.Session.query(harvest_model.HarvestJob) \
                     .order_by(harvest_model.HarvestJob.created.desc()) \
                     .first()
-    job = MagicMock()
+    job = mock.MagicMock()
     job.source = last_job.source
     job.id = ''
     return bool(CKANHarvester._last_error_free_job(job))
