@@ -4,7 +4,7 @@ from sqlalchemy import MetaData
 from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.tests.factories import (HarvestSourceObj, HarvestJobObj,
                                              HarvestObjectObj)
-import mock_ckan
+from ckanext.harvest.tests.harvesters import mock_ckan
 import mock
 from ckan import model
 from ckan.tests.helpers import reset_db
@@ -133,6 +133,21 @@ ckanharvester.config') as config:
         assert harvest_object.errors == []
         assert result
         assert harvest_object.package_id
+        clause = Tables.rinkmena.select().where(Tables.rinkmena.c.ID == 2)
+        opendatagov_database = dict()
+        for row in con.execute(clause):
+            for row_name in row.keys():
+                opendatagov_database[row_name] = row[row_name]
+        org = Organization()
+        harvest_object = HarvestObjectObj(
+            guid=opendatagov_database['ID'],
+            content=json.dumps(opendatagov_database),
+            job__source__owner_org=org['id'])
+        harvester = CKANHarvester()
+        result = harvester.import_stage(harvest_object)
+        assert harvest_object.errors == []
+        assert result
+        assert harvest_object.package_id
 
     def test_harvest(self):
         db_url = 'sqlite:///opendatagov.db'
@@ -157,3 +172,8 @@ ckanharvester.config') as config:
         assert result['state'] == 'COMPLETE'
         assert result['report_status'] == 'added'
         assert result['errors'] == []
+        result = results_by_guid['2']
+        assert result['state'] == 'COMPLETE'
+        assert result['report_status'] == 'added'
+        assert result['errors'] == []
+        assert was_last_job_considered_error_free()
