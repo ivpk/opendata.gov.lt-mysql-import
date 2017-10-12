@@ -4,15 +4,20 @@
 #
 #    pip-compile --output-file requirements-dev.txt requirements-dev.in
 #
+-e git+https://github.com/ckan/ckan.git#egg=ckan
 -e git+https://github.com/ckan/ckanext-harvest.git#egg=ckanext-harvest
-ckan==2.7.2
 coverage==4.4.1           # via pytest-cov
 funcsigs==1.0.2           # via mock
 mock==2.0.0               # via pytest-mock
 pbr==3.1.1                # via mock
+psycopg2==2.7.3.1
 py==1.4.34                # via pytest
 pytest-cov==2.5.1
 pytest-mock==1.6.3
 pytest==3.2.3
 six==1.11.0               # via mock
 sqlalchemy==1.1.14
+
+# The following packages are commented out because they are
+# considered to be unsafe in a requirements file:
+# setuptools                # via pytest
