@@ -3,3 +3,4 @@
 .cache/
 tags
 /env/
+.coverage
