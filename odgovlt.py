@@ -4,8 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy import MetaData
 from ckanext.harvest.model import HarvestObject
 import logging
-from base import HarvesterBase
-from ckan.common import config
+from ckanext.harvest.harvesters.base import HarvesterBase
 import json
 from datetime import datetime
 
@@ -21,8 +20,11 @@ class DatetimeEncoder(json.JSONEncoder):
 
 
 class ODGovLt(HarvesterBase):
-    def _connect_to_database(self):
-        con = create_engine(config['odgovltimport.externaldb.url'])
+    def _connect_to_database(self, dburi):
+        if isinstance(dburi, str):
+            con = create_engine(dburi)
+        else:
+            con = dburi
         meta = MetaData(bind=con, reflect=True)
         return con, meta
 
@@ -36,7 +38,7 @@ class ODGovLt(HarvesterBase):
 
     def gather_stage(self, harvest_job):
         log.debug('In opendatagov gather_stage')
-        con, meta = self._connect_to_database()
+        con, meta = self._connect_to_database(harvest_job.source.url)
 
         class Tables(object):
             rinkmena = meta.tables['t_rinkmena']
