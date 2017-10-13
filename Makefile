@@ -21,4 +21,8 @@ requirements-dev.txt: requirements-dev.in
 
 .PHONY: test
 test: env/bin/py.test
-	env/bin/py.test tests
+	env/bin/py.test -vv --tb=native --cov-report=term-missing --cov=odgovlt tests
+
+.PHONY: tags
+tags:
+	ctags --recurse odgovlt.py env/src env/lib

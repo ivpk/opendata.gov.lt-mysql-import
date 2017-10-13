@@ -1,20 +1,22 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
+
 import collections
 import contextlib
 import gettext
-import hashlib
 import json
+import logging
 import os
 
-from ckan import model
 from ckan.tests.factories import Organization
 from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.tests.factories import (HarvestSourceObj, HarvestJobObj, HarvestObjectObj)
 from ckanext.harvest.tests.harvesters import mock_ckan
 from ckanext.harvest.tests.lib import run_harvest
 import ckan.config.middleware
-import ckanext.harvest.model as harvest_model
+import ckan.model
+import ckanext.harvest.model
 import mock
 import pkg_resources as pres
 import psycopg2
@@ -24,7 +26,7 @@ import pytest
 import sqlalchemy as sa
 import webtest
 
-from odgovlt import ODGovLt
+from odgovlt import OdgovltHarvester
 
 
 class CKANTestApp(webtest.TestApp):
@@ -42,9 +44,12 @@ class CKANTestApp(webtest.TestApp):
 
 
 def was_last_job_considered_error_free():
-    last_job = model.Session.query(harvest_model.HarvestJob) \
-                    .order_by(harvest_model.HarvestJob.created.desc()) \
-                    .first()
+    last_job = (
+        ckan.model.Session.
+        query(ckanext.harvest.model.HarvestJob).
+        order_by(ckanext.harvest.model.HarvestJob.created.desc()).
+        first()
+    )
     job = mock.MagicMock()
     job.source = last_job.source
     job.id = ''
@@ -54,14 +59,14 @@ def was_last_job_considered_error_free():
 @pytest.fixture
 def db():
     engine = sa.create_engine('sqlite://')
-    db = sa.MetaData()
+    meta = sa.MetaData()
 
     with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
         engine.raw_connection().executescript(f.read())
 
-    db.reflect(bind=engine)
+    meta.reflect(bind=engine)
 
-    return collections.namedtuple('DB', ('engine', 'metadata'))(engine, db)
+    return collections.namedtuple('DB', ('engine', 'meta'))(engine, meta)
 
 
 @pytest.fixture
@@ -76,7 +81,15 @@ def postgres():
 
 
 @pytest.fixture
-def app(postgres):
+def app(postgres, mocker, caplog):
+    caplog.set_level(logging.WARNING, logger='ckan.lib.i18n')
+    caplog.set_level(logging.WARNING, logger='migrate')
+    caplog.set_level(logging.WARNING, logger='pyutilib')
+    caplog.set_level(logging.WARNING, logger='vdm')
+    caplog.set_level(logging.WARNING, logger='pysolr')
+
+    mocker.patch('ckan.lib.search.check_solr_schema_version')
+
     global_config = {
         '__file__': '',
         'here': os.path.dirname(__file__),
@@ -91,77 +104,42 @@ def app(postgres):
     app = ckan.config.middleware.make_app(global_config, **app_config)
     app = CKANTestApp(app)
 
-    import ckan.model as model
-
-    model.repo.init_db()
-
-    # harvest_model.setup()
+    ckan.model.repo.init_db()
+    ckanext.harvest.model.setup()
 
     pylons.translator = gettext.NullTranslations()
 
     return app
 
 
-@pytest.fixture
-def ckanfixture(db):
-    conn = db.engine
+def test_gather(app, db, mocker):
+    mocker.patch('odgovlt.OdgovltHarvester._connect_to_database', return_value=db)
 
-    user_id, = conn.execute(db.metadata.tables['t_user'].insert(), {
-        'LOGIN': 'vardenis',
-        'FIRST_NAME': 'Vardenis',
-        'LAST_NAME': 'Pavardenis',
-        'EMAIL': 'vardenis@example.com',
-        'TELEFONAS': '+37067000000',
-        'PASS': hashlib.md5(b'secret').hexdigest(),
-    }).inserted_primary_key
+    db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
+        'PAVADINIMAS': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
+        'SANTRAUKA': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
+        'TINKLAPIS': 'http://www.vkekk.lt/siluma/Puslapiai/licencijavimas/licenciju-turetojai.aspx',
+        'K_EMAIL': 'jonaiste.jusionyte@regula.lt',
+    })
 
-    conn.execute('''
-        INSERT INTO t_rinkmena VALUES(1, 'Šilumos tiekimo licencijas\
-turinčių įmonių sąrašas', '​Šilumos tiekimo\
-licencijas turinčių įmonių sąrašas',\
-'http://www.vkekk.lt/siluma/Puslapiai/licencijavimas/licenciju-turetojai.aspx',\
-'jonaiste.jusionyte@regula.lt')
-        ''')
-    conn.execute('''
-        INSERT INTO t_rinkmena VALUES(2, '2014 m. vidutinio\
-metinio paros eismo intensyvumo duomenys', 'Pateikiama\
-informacija: kelio numeris, ruožo pradžia, ruožo\
-pabaiga, vidutinis metinis paros eismo \
-intensyvumas, metai, automobilių tipai',\
-'http://lakd.lrv.lt/lt/atviri-duomenys/vidutinio-m\
-etinio-paros-eismo-intensyvumo-valstybines-reik\
-smes-keliuose-duomenys-2013-m', 'vytautas.timukas@lakd.lt')
-        ''')
+    db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
+        'PAVADINIMAS': '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
+        'SANTRAUKA': 'Pateikiama informacija: kelio numeris, ruožo pradžia, ruožo pabaiga, vidutinis metinis paros '
+                     'eismo  intensyvumas, metai, automobilių tipai',
+        'TINKLAPIS': 'http://lakd.lrv.lt/lt/atviri-duomenys/vidutinio-metinio-paros-eismo-intensyvumo-valstybines-'
+                     'reiksmes-keliuose-duomenys-2013-m',
+        'K_EMAIL': 'vytautas.timukas@lakd.lt',
+    })
 
-
-def test_gather(app, db):
-    class Tables(object):
-        rinkmena = db.metadata.tables['t_rinkmena']
-
-    clause = Tables.rinkmena.select()
-    opendatagov_database = dict()
-    for row in db.engine.execute(clause):
-        opendatagov_database[row[0]] = row
-
-    source = HarvestSourceObj(url=db.engine)
+    source = HarvestSourceObj(url='sqlite://', source_type='opendata-gov-lt')
     job = HarvestJobObj(source=source)
-    harvester = ODGovLt()
+    harvester = OdgovltHarvester()
     obj_ids = harvester.gather_stage(job)
     assert job.gather_errors == []
-    assert isinstance(obj_ids, list)
-    assert len(obj_ids) == len(opendatagov_database)
-    harvest_object = harvest_model.HarvestObject.get(obj_ids[0])
-    assert harvest_object.guid == str(opendatagov_database.keys()[0])
-    content = json.loads(harvest_object.content)
-    assert content['ID'] == opendatagov_database[1][0]
-    assert content['PAVADINIMAS'] == opendatagov_database[1][1]
-    assert content['SANTRAUKA'] == opendatagov_database[1][2]
-    harvest_object = harvest_model.HarvestObject.get(obj_ids[1])
-    assert harvest_object.guid == str(opendatagov_database.keys()[1])
-    content = json.loads(harvest_object.content)
-    assert content['ID'] == opendatagov_database[2][0]
-    assert content['PAVADINIMAS'] == opendatagov_database[2][1]
-    assert content['SANTRAUKA'] == opendatagov_database[2][2]
+    assert [json.loads(ckanext.harvest.model.HarvestObject.get(x).content)['PAVADINIMAS'] for x in obj_ids] == [
+        'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
+        '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
+    ]
 
 
 def test_fetch():

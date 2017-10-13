@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
+
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData
 from ckanext.harvest.model import HarvestObject
@@ -14,23 +16,25 @@ log = logging.getLogger(__name__)
 class DatetimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
-            return obj.strftime('%Y-%m-%dT%H:%M:%S')
+            try:
+                return obj.strftime('%Y-%m-%dT%H:%M:%S')
+            except ValueError:
+                # strftime gives ValueError for 0000-00-00 00:00:00 datetimes.
+                return None
         else:
             return super(DatetimeEncoder, obj).default(obj)
 
 
-class ODGovLt(HarvesterBase):
+class OdgovltHarvester(HarvesterBase):
+
     def _connect_to_database(self, dburi):
-        if isinstance(dburi, str):
-            con = create_engine(dburi)
-        else:
-            con = dburi
+        con = create_engine(dburi)
         meta = MetaData(bind=con, reflect=True)
         return con, meta
 
     def info(self):
         return {
-            'name': 'opendatagov',
+            'name': 'opendata-gov-lt',
             'title': 'opendata.gov.lt',
             'description': 'Harvest opendata.gov.lt',
             'form_config_interface': 'Text'
@@ -50,10 +54,7 @@ class ODGovLt(HarvesterBase):
             for row_name in row.keys():
                 database_data[row_name] = row[row_name]
             id = database_data['ID']
-            obj = HarvestObject(
-                  guid=id,
-                  job=harvest_job,
-                  content=json.dumps(database_data, cls=DatetimeEncoder))
+            obj = HarvestObject(guid=id, job=harvest_job, content=json.dumps(database_data, cls=DatetimeEncoder))
             obj.save()
             ids.append(obj.id)
         return ids
@@ -64,8 +65,9 @@ class ODGovLt(HarvesterBase):
     def import_stage(self, harvest_object):
         data_to_import = json.loads(harvest_object.content)
         package_dict = {
-                'id': harvest_object.guid,
-                'title': data_to_import['PAVADINIMAS'],
-                'notes': data_to_import['SANTRAUKA'],
-                'owner_org': 'orga'}
+            'id': harvest_object.guid,
+            'title': data_to_import['PAVADINIMAS'],
+            'notes': data_to_import['SANTRAUKA'],
+            'owner_org': 'orga',
+        }
         return self._create_or_update_package(package_dict, harvest_object)

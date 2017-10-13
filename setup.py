@@ -20,7 +20,7 @@ setup(
     },
     entry_points={
         'ckan.plugins': [
-            'odgovlt_harvester=ckanext.harvest.harvesters:CKANHarvester',
+            'odgovlt_harvester=odgovlt:OdgovltHarvester',
         ]
     },
 )
