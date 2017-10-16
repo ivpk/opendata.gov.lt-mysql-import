@@ -11,9 +11,12 @@ import os
 
 from ckan.tests.factories import Organization
 from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
-from ckanext.harvest.tests.factories import (HarvestSourceObj, HarvestJobObj, HarvestObjectObj)
-from ckanext.harvest.tests.harvesters import mock_ckan
+from ckanext.harvest.tests.factories import (
+                          HarvestSourceObj,
+                          HarvestJobObj,
+                          HarvestObjectObj)
 from ckanext.harvest.tests.lib import run_harvest
+from ckan.tests.helpers import reset_db
 import ckan.config.middleware
 import ckan.model
 import ckanext.harvest.model
@@ -27,6 +30,7 @@ import sqlalchemy as sa
 import webtest
 
 from odgovlt import OdgovltHarvester
+from odgovlt import DatetimeEncoder
 
 
 class CKANTestApp(webtest.TestApp):
@@ -72,8 +76,10 @@ def db():
 @pytest.fixture
 def postgres():
     dbname = 'odgovlt_mysql_import_tests'
-    with contextlib.closing(psycopg2.connect('postgresql:///postgres')) as conn:
-        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+    with contextlib.closing(psycopg2.connect(
+                         'postgresql:///postgres')) as conn:
+        conn.set_isolation_level(
+                         psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         with contextlib.closing(conn.cursor()) as curs:
             curs.execute('DROP DATABASE IF EXISTS ' + dbname)
             curs.execute('CREATE DATABASE ' + dbname + ' ENCODING = utf8')
@@ -112,21 +118,27 @@ def app(postgres, mocker, caplog):
     return app
 
 
-def test_gather(app, db, mocker):
-    mocker.patch('odgovlt.OdgovltHarvester._connect_to_database', return_value=db)
+def test_OdgovltHarvester(app, db, mocker):
+    mocker.patch(
+            'odgovlt.OdgovltHarvester._connect_to_database',
+            return_value=db)
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
         'PAVADINIMAS': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
         'SANTRAUKA': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
-        'TINKLAPIS': 'http://www.vkekk.lt/siluma/Puslapiai/licencijavimas/licenciju-turetojai.aspx',
+        'TINKLAPIS': 'http://www.vkekk.lt/siluma/Puslapiai/'
+                     'licencijavimas/licenciju-turetojai.aspx',
         'K_EMAIL': 'jonaiste.jusionyte@regula.lt',
     })
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
-        'PAVADINIMAS': '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
-        'SANTRAUKA': 'Pateikiama informacija: kelio numeris, ruožo pradžia, ruožo pabaiga, vidutinis metinis paros '
-                     'eismo  intensyvumas, metai, automobilių tipai',
-        'TINKLAPIS': 'http://lakd.lrv.lt/lt/atviri-duomenys/vidutinio-metinio-paros-eismo-intensyvumo-valstybines-'
+        'PAVADINIMAS': '2014 m. vidutinio metinio paros '
+                       'eismo intensyvumo duomenys',
+        'SANTRAUKA': 'Pateikiama informacija: kelio numeris, ruožo pradžia, '
+                     'ruožo pabaiga, vidutinis metinis paros eismo '
+                     'intensyvumas, metai, automobilių tipai',
+        'TINKLAPIS': 'http://lakd.lrv.lt/lt/atviri-duomenys/'
+                     'vidutinio-metinio-paros-eismo-intensyvumo-valstybines-'
                      'reiksmes-keliuose-duomenys-2013-m',
         'K_EMAIL': 'vytautas.timukas@lakd.lt',
     })
@@ -136,84 +148,46 @@ def test_gather(app, db, mocker):
     harvester = OdgovltHarvester()
     obj_ids = harvester.gather_stage(job)
     assert job.gather_errors == []
-    assert [json.loads(ckanext.harvest.model.HarvestObject.get(x).content)['PAVADINIMAS'] for x in obj_ids] == [
+    assert [json.loads(
+               ckanext.harvest.model.HarvestObject.get(x).content
+               )['PAVADINIMAS'] for x in obj_ids] == [
         'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
         '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
     ]
-
-
-def test_fetch():
-    source = HarvestSourceObj(url='http://localhost:%s/' % mock_ckan.PORT)
-    job = HarvestJobObj(source=source)
-    harvest_object = HarvestObjectObj(
-        guid=mock_ckan.DATASETS[0]['id'],
+    clause = db.meta.tables['t_rinkmena'].select()
+    database_data = dict()
+    database_data_list = []
+    for row in db.engine.execute(clause):
+        for row_name in row.keys():
+            database_data[row_name] = row[row_name]
+        database_data_list.append(database_data)
+    org = Organization()
+    obj1 = HarvestObjectObj(
+        guid=database_data_list[0]['ID'],
         job=job,
-        content=json.dumps(mock_ckan.DATASETS[0]))
-    harvester = CKANHarvester()
-    result = harvester.fetch_stage(harvest_object)
-    assert harvest_object.errors == []
-    assert result
-
-
-def test_import():
-    db_url = 'sqlite:///opendatagov.db'
-    con = sa.create_engine(db_url)
-    meta = sa.MetaData(bind=con, reflect=True)
-
-    class Tables(object):
-        rinkmena = meta.tables['t_rinkmena']
-
-    clause = Tables.rinkmena.select().where(Tables.rinkmena.c.ID == 1)
-    opendatagov_database = dict()
-    for row in con.execute(clause):
-        for row_name in row.keys():
-            opendatagov_database[row_name] = row[row_name]
-    org = Organization()
-    harvest_object = HarvestObjectObj(
-        guid=opendatagov_database['ID'],
-        content=json.dumps(opendatagov_database),
+        content=json.dumps(database_data_list[0], cls=DatetimeEncoder),
         job__source__owner_org=org['id'])
-    harvester = CKANHarvester()
-    result = harvester.import_stage(harvest_object)
-    assert harvest_object.errors == []
+    result = harvester.fetch_stage(obj1)
+    assert obj1.errors == []
     assert result
-    assert harvest_object.package_id
-    clause = Tables.rinkmena.select().where(Tables.rinkmena.c.ID == 2)
-    opendatagov_database = dict()
-    for row in con.execute(clause):
-        for row_name in row.keys():
-            opendatagov_database[row_name] = row[row_name]
-    org = Organization()
-    harvest_object = HarvestObjectObj(
-        guid=opendatagov_database['ID'],
-        content=json.dumps(opendatagov_database),
+    obj2 = HarvestObjectObj(
+        guid=database_data_list[1]['ID'],
+        job=job,
+        content=json.dumps(database_data_list[1], cls=DatetimeEncoder),
         job__source__owner_org=org['id'])
-    harvester = CKANHarvester()
-    result = harvester.import_stage(harvest_object)
-    assert harvest_object.errors == []
+    result = harvester.fetch_stage(obj2)
+    assert obj2.errors == []
     assert result
-    assert harvest_object.package_id
-
-
-def test_harvest():
-    db_url = 'sqlite:///opendatagov.db'
-    con = sa.create_engine(db_url)
-    meta = sa.MetaData(bind=con, reflect=True)
-
-    class Tables(object):
-        rinkmena = meta.tables['t_rinkmena']
-
-    clause = Tables.rinkmena.select().where(Tables.rinkmena.c.ID == 1)
-    opendatagov_database = dict()
-    for row in con.execute(clause):
-        for row_name in row.keys():
-            opendatagov_database[row_name] = row[row_name]
-    with mock.patch('ckanext.harvest.harvesters.\
-ckanharvester.config') as config:
-        config.__getitem__.side_effect = db_url.split()
-        results_by_guid = run_harvest(
-            url='http://localhost:%s/' % mock_ckan.PORT,
-            harvester=CKANHarvester())
+    create_or_update = harvester.import_stage(obj1)
+    assert create_or_update
+    create_or_update = harvester.import_stage(obj2)
+    assert create_or_update
+    assert obj1.package_id
+    assert obj2.package_id
+    reset_db()
+    results_by_guid = run_harvest(
+            url='sqlite://',
+            harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
     assert result['report_status'] == 'added'

@@ -68,6 +68,5 @@ class OdgovltHarvester(HarvesterBase):
             'id': harvest_object.guid,
             'title': data_to_import['PAVADINIMAS'],
             'notes': data_to_import['SANTRAUKA'],
-            'owner_org': 'orga',
         }
         return self._create_or_update_package(package_dict, harvest_object)
