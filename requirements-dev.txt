@@ -11,7 +11,8 @@ funcsigs==1.0.2           # via mock
 mock==2.0.0               # via pytest-mock
 pbr==3.1.1                # via mock
 psycopg2==2.7.3.1
-py==1.4.34                # via pytest
+py==1.4.34                # via pytest, pytest-catchlog
+pytest-catchlog==1.2.2
 pytest-cov==2.5.1
 pytest-mock==1.6.3
 pytest==3.2.3
