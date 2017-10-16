@@ -8,4 +8,6 @@ script:
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
   - make
-  - env/bin/py.test -vvx tests
+  - env/bin/pip install pytest-catchlog
+  - env/bin/py.test -vvx tests/test_odgovlt.py
+  
