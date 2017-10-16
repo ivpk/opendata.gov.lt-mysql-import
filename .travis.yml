@@ -7,4 +7,5 @@ script:
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
-  - make test
+  - make
+  - env/bin/py.test -vvx tests
