@@ -82,7 +82,7 @@ def postgres():
                          psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         with contextlib.closing(conn.cursor()) as curs:
             curs.execute('DROP DATABASE IF EXISTS ' + dbname)
-            curs.execute('CREATE DATABASE ' + dbname + ' ENCODING = utf8')
+            curs.execute('CREATE DATABASE ' + dbname)
     return 'postgresql:///%s' % dbname
 
 
