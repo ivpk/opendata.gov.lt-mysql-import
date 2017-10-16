@@ -54,7 +54,12 @@ class OdgovltHarvester(HarvesterBase):
             for row_name in row.keys():
                 database_data[row_name] = row[row_name]
             id = database_data['ID']
-            obj = HarvestObject(guid=id, job=harvest_job, content=json.dumps(database_data, cls=DatetimeEncoder))
+            obj = HarvestObject(
+                         guid=id,
+                         job=harvest_job,
+                         content=json.dumps(
+                              database_data,
+                              cls=DatetimeEncoder))
             obj.save()
             ids.append(obj.id)
         return ids
