@@ -9,6 +9,8 @@ import logging
 from ckanext.harvest.harvesters.base import HarvesterBase
 import json
 from datetime import datetime
+from ckan.logic import get_action
+from ckan import model
 
 log = logging.getLogger(__name__)
 
@@ -68,10 +70,17 @@ class OdgovltHarvester(HarvesterBase):
         return True
 
     def import_stage(self, harvest_object):
+        base_context = {'model': model, 'session': model.Session,
+                        'user': self._get_user_name()}
         data_to_import = json.loads(harvest_object.content)
+        source_dataset = get_action('package_show')(
+                           base_context.copy(), 
+                           {'id': harvest_object.source.id})
+        local_org = source_dataset.get('owner_org')
         package_dict = {
             'id': harvest_object.guid,
             'title': data_to_import['PAVADINIMAS'],
             'notes': data_to_import['SANTRAUKA'],
+            'owner_org': local_org
         }
         return self._create_or_update_package(package_dict, harvest_object)
