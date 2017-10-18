@@ -1,3 +1,7 @@
+.. image:: https://travis-ci.org/ivpk/opendata.gov.lt-mysql-import.svg?branch=master
+    :target: https://travis-ci.org/ivpk/opendata.gov.lt-mysql-import
+
+
 Harvester for opendata.gov.lt old database. This harvester connects directly to
 MySQL database of old opendata.gov.lt website and harvestes datasets from there
 to CKAN.
