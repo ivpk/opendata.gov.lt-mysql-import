@@ -9,7 +9,6 @@ import json
 import logging
 import os
 
-from ckan.tests.factories import Organization
 from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
 from ckanext.harvest.tests.factories import (
                           HarvestSourceObj,
@@ -17,6 +16,7 @@ from ckanext.harvest.tests.factories import (
                           HarvestObjectObj)
 from ckanext.harvest.tests.lib import run_harvest
 from ckan.tests.helpers import reset_db
+import ckan.lib.search.index
 import ckan.config.middleware
 import ckan.model
 import ckanext.harvest.model
@@ -122,6 +122,7 @@ def test_OdgovltHarvester(app, db, mocker):
     mocker.patch(
             'odgovlt.OdgovltHarvester._connect_to_database',
             return_value=db)
+    mocker.patch('ckan.lib.search.index.make_connection')
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
         'PAVADINIMAS': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
@@ -161,20 +162,17 @@ def test_OdgovltHarvester(app, db, mocker):
         for row_name in row.keys():
             database_data[row_name] = row[row_name]
         database_data_list.append(database_data)
-    org = Organization()
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
-        content=json.dumps(database_data_list[0], cls=DatetimeEncoder),
-        job__source__owner_org=org['id'])
+        content=json.dumps(database_data_list[0], cls=DatetimeEncoder))
     result = harvester.fetch_stage(obj1)
     assert obj1.errors == []
     assert result
     obj2 = HarvestObjectObj(
         guid=database_data_list[1]['ID'],
         job=job,
-        content=json.dumps(database_data_list[1], cls=DatetimeEncoder),
-        job__source__owner_org=org['id'])
+        content=json.dumps(database_data_list[1], cls=DatetimeEncoder))
     result = harvester.fetch_stage(obj2)
     assert obj2.errors == []
     assert result
