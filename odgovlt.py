@@ -74,7 +74,7 @@ class OdgovltHarvester(HarvesterBase):
                         'user': self._get_user_name()}
         data_to_import = json.loads(harvest_object.content)
         source_dataset = get_action('package_show')(
-                           base_context.copy(), 
+                           base_context.copy(),
                            {'id': harvest_object.source.id})
         local_org = source_dataset.get('owner_org')
         package_dict = {
