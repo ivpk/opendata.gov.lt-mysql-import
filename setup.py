@@ -7,11 +7,6 @@ setup(
     license='AGPL',
     packages=find_packages(),
     include_package_data=True,
-    entry_points={
-        'paste.paster_command': [
-            'odgovltsync=odgovltimport:OpenDataGovLtCommand',
-        ]
-    },
     install_requires=[
         'Unidecode',
         'sqlalchemy',
@@ -21,6 +16,11 @@ setup(
         'tests': [
             'pytest',
             'pytest-catchlog',
+        ]
+    },
+    entry_points={
+        'ckan.plugins': [
+            'odgovlt_harvester=odgovlt:OdgovltHarvester',
         ]
     },
 )

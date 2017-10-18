@@ -1,0 +1,11 @@
+language: python
+python:
+  - "2.7"
+install:
+  - pip install flake8 docutils
+script:
+  - flake8 odgovlt.py
+  - rst2html.py --strict README.rst /dev/null
+  - flake8 tests
+  - make test
+  

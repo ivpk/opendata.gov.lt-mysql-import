@@ -2,3 +2,5 @@
 *.egg-info/
 .cache/
 tags
+/env/
+.coverage
