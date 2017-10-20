@@ -176,12 +176,13 @@ def test_OdgovltHarvester(app, db, mocker):
     result = harvester.fetch_stage(obj2)
     assert obj2.errors == []
     assert result
-    create_or_update = harvester.import_stage(obj1)
+    create_or_update, package_dict = harvester.import_stage(obj1)
     assert create_or_update
     create_or_update = harvester.import_stage(obj2)
     assert create_or_update
     assert obj1.package_id
     assert obj2.package_id
+    assert 'owner_org' in package_dict
     reset_db()
     results_by_guid = run_harvest(
             url='sqlite://',

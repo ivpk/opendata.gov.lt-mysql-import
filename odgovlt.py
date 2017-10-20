@@ -73,6 +73,9 @@ class OdgovltHarvester(HarvesterBase):
         base_context = {'model': model, 'session': model.Session,
                         'user': self._get_user_name()}
         data_to_import = json.loads(harvest_object.content)
+        R_ZODZIAI_STRING = '%s' % data_to_import['R_ZODZIAI']
+        R_ZODZIAI_STRING = R_ZODZIAI_STRING.replace(u'\u200b', '')
+        R_ZODZIAI = R_ZODZIAI_STRING.split(', ')
         source_dataset = get_action('package_show')(
                            base_context.copy(),
                            {'id': harvest_object.source.id})
@@ -81,6 +84,11 @@ class OdgovltHarvester(HarvesterBase):
             'id': harvest_object.guid,
             'title': data_to_import['PAVADINIMAS'],
             'notes': data_to_import['SANTRAUKA'],
-            'owner_org': local_org
+            'url': data_to_import['TINKLAPIS'],
+            'tags': R_ZODZIAI,
+            'maintainer_email': data_to_import['K_EMAIL'],
+            'owner_org': local_org,
         }
-        return self._create_or_update_package(package_dict, harvest_object)
+        return (
+                self._create_or_update_package(package_dict, harvest_object),
+                package_dict)
