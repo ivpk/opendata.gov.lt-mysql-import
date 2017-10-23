@@ -16,6 +16,8 @@ from ckanext.harvest.tests.factories import (
                           HarvestObjectObj)
 from ckanext.harvest.tests.lib import run_harvest
 from ckan.tests.helpers import reset_db
+from ckan.logic import get_action
+from ckan import model
 import ckan.lib.search.index
 import ckan.config.middleware
 import ckan.model
@@ -31,7 +33,6 @@ import webtest
 
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
-import odgovlt
 
 
 class CKANTestApp(webtest.TestApp):
@@ -202,13 +203,13 @@ def test_OdgovltHarvester(app, db, mocker):
     assert result['report_status'] == 'added'
     assert result['errors'] == []
     assert was_last_job_considered_error_free()
-    tag1 = odgovlt.get_package_tags(database_data_list[0]['R_ZODZIAI'])
-    tag2 = odgovlt.get_package_tags(database_data_list[1]['R_ZODZIAI'])
-    assert isinstance(tag1, list)
-    assert isinstance(tag2, list)
-    tag11 = database_data_list[0]['R_ZODZIAI']
-    tag12 = database_data_list[1]['R_ZODZIAI']
-    tag_1 = tag11.lower().replace(u'\u200b', ' ').split(',')
-    tag_2 = tag12.lower().replace(u'\u200b', ' ').split(',')
-    assert tag1 == tag_1
-    assert tag2 == tag_2
+    tag1 = database_data_list[0]['R_ZODZIAI']
+    tag2 = database_data_list[1]['R_ZODZIAI']
+    tag_1 = tag1.lower().replace(u'\u200b', '').split(',')
+    tag_2 = tag2.lower().replace(u'\u200b', '').split(',')
+    tag = tag_1 + tag_2
+    context = {'model': model, 'session': model.Session, 'ignore_auth': True}
+    tag_list = get_action('tag_list')(context, {})
+    assert tag_list
+    assert isinstance(tag_list, list)
+    assert set(tag) == set(tag_list)

@@ -29,7 +29,7 @@ def fixcase(value):
 
 def tagify(tag):
     spl = re.split(r'\W+', tag, flags=re.UNICODE)
-    return ' '.join(spl)
+    return ' '.join(spl).strip()
 
 
 def get_package_tags(r_zodziai):
