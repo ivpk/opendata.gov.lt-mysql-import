@@ -31,6 +31,7 @@ import webtest
 
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
+import odgovlt
 
 
 class CKANTestApp(webtest.TestApp):
@@ -129,6 +130,11 @@ def test_OdgovltHarvester(app, db, mocker):
         'SANTRAUKA': 'Šilumos tiekimo licencijas turinčių įmonių sąrašas',
         'TINKLAPIS': 'http://www.vkekk.lt/siluma/Puslapiai/'
                      'licencijavimas/licenciju-turetojai.aspx',
+        'R_ZODZIAI': '​Šilumos tiekimo licencijas turinčių įmonių sąrašas,'
+                     'šiluma,'
+                     'šilumos tiekėjai,'
+                     'licencijos,'
+                     'licencijuojamos veiklos teritorija',
         'K_EMAIL': 'jonaiste.jusionyte@regula.lt',
     })
 
@@ -141,6 +147,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'TINKLAPIS': 'http://lakd.lrv.lt/lt/atviri-duomenys/'
                      'vidutinio-metinio-paros-eismo-intensyvumo-valstybines-'
                      'reiksmes-keliuose-duomenys-2013-m',
+        'R_ZODZIAI': 'keliai,eismo intensyvumas',
         'K_EMAIL': 'vytautas.timukas@lakd.lt',
     })
 
@@ -156,12 +163,12 @@ def test_OdgovltHarvester(app, db, mocker):
         '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
     ]
     clause = db.meta.tables['t_rinkmena'].select()
-    database_data = dict()
+    database_data = {}
     database_data_list = []
     for row in db.engine.execute(clause):
         for row_name in row.keys():
             database_data[row_name] = row[row_name]
-        database_data_list.append(database_data)
+        database_data_list.append(database_data.copy())
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
@@ -176,13 +183,12 @@ def test_OdgovltHarvester(app, db, mocker):
     result = harvester.fetch_stage(obj2)
     assert obj2.errors == []
     assert result
-    create_or_update, package_dict = harvester.import_stage(obj1)
+    create_or_update = harvester.import_stage(obj1)
     assert create_or_update
     create_or_update = harvester.import_stage(obj2)
     assert create_or_update
     assert obj1.package_id
     assert obj2.package_id
-    assert 'owner_org' in package_dict
     reset_db()
     results_by_guid = run_harvest(
             url='sqlite://',
@@ -196,3 +202,13 @@ def test_OdgovltHarvester(app, db, mocker):
     assert result['report_status'] == 'added'
     assert result['errors'] == []
     assert was_last_job_considered_error_free()
+    tag1 = odgovlt.get_package_tags(database_data_list[0]['R_ZODZIAI'])
+    tag2 = odgovlt.get_package_tags(database_data_list[1]['R_ZODZIAI'])
+    assert isinstance(tag1, list)
+    assert isinstance(tag2, list)
+    tag11 = database_data_list[0]['R_ZODZIAI']
+    tag12 = database_data_list[1]['R_ZODZIAI']
+    tag_1 = tag11.lower().replace(u'\u200b', ' ').split(',')
+    tag_2 = tag12.lower().replace(u'\u200b', ' ').split(',')
+    assert tag1 == tag_1
+    assert tag2 == tag_2

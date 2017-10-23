@@ -11,8 +11,41 @@ import json
 from datetime import datetime
 from ckan.logic import get_action
 from ckan import model
+import re
+import string
 
 log = logging.getLogger(__name__)
+
+
+def fixcase(value):
+    if len(value) > 1 and \
+           value[:2].isalpha() and \
+           value[0].isupper() and \
+           value[1].islower():
+        return value[0].lower() + value[1:]
+    else:
+        return value
+
+
+def tagify(tag):
+    spl = re.split(r'\W+', tag, flags=re.UNICODE)
+    return ' '.join(spl)
+
+
+def get_package_tags(r_zodziai):
+    name_list = []
+    if r_zodziai:
+        tags = map(fixcase,
+                   map(string.strip,
+                       r_zodziai.replace(';', ',').split(',')))
+        for tag in filter(None, tags):
+            name = tagify(tag).lower()
+
+            if len(name) > 100:
+                log.warn("skip very long tag: %r", tag)
+            else:
+                name_list.append(name)
+    return name_list
 
 
 class DatetimeEncoder(json.JSONEncoder):
@@ -73,9 +106,6 @@ class OdgovltHarvester(HarvesterBase):
         base_context = {'model': model, 'session': model.Session,
                         'user': self._get_user_name()}
         data_to_import = json.loads(harvest_object.content)
-        R_ZODZIAI_STRING = '%s' % data_to_import['R_ZODZIAI']
-        R_ZODZIAI_STRING = R_ZODZIAI_STRING.replace(u'\u200b', '')
-        R_ZODZIAI = R_ZODZIAI_STRING.split(', ')
         source_dataset = get_action('package_show')(
                            base_context.copy(),
                            {'id': harvest_object.source.id})
@@ -85,10 +115,8 @@ class OdgovltHarvester(HarvesterBase):
             'title': data_to_import['PAVADINIMAS'],
             'notes': data_to_import['SANTRAUKA'],
             'url': data_to_import['TINKLAPIS'],
-            'tags': R_ZODZIAI,
+            'tags': get_package_tags(data_to_import['R_ZODZIAI']),
             'maintainer_email': data_to_import['K_EMAIL'],
             'owner_org': local_org,
         }
-        return (
-                self._create_or_update_package(package_dict, harvest_object),
-                package_dict)
+        return self._create_or_update_package(package_dict, harvest_object)
