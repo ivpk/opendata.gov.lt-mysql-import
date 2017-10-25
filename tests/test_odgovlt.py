@@ -163,9 +163,7 @@ def test_OdgovltHarvester(app, db, mocker):
         '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
     ]
     clause = db.meta.tables['t_rinkmena'].select()
-    database_data_list = []
-    for row in db.engine.execute(clause):
-        database_data_list.append(dict(row))
+    database_data_list = [dict(row) for row in db.engine.execute(clause)]
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
@@ -200,9 +198,39 @@ def test_OdgovltHarvester(app, db, mocker):
     assert result['errors'] == []
     assert was_last_job_considered_error_free()
     ckanapi = CkanAPI()
-    ids = []
-    for x in ckanapi.package_list():
-        ids.append(x)
+    ids = ckanapi.package_list()
+    package = [ckanapi.package_show(id=ids[0])]
+    assert [(x['title'],) for x in package] == [
+        ('2014 m. vidutinio metinio paros '
+         'eismo intensyvumo duomenys',),
+    ]
+    assert [(x['notes'],) for x in package] == [
+        ('Pateikiama informacija: kelio numeris, ruožo pradžia, '
+         'ruožo pabaiga, vidutinis metinis paros eismo '
+         'intensyvumas, metai, automobilių tipai',),
+    ]
+    assert [(x['url'],) for x in package] == [
+        ('http://lakd.lrv.lt/lt/atviri-duomenys/'
+         'vidutinio-metinio-paros-eismo-intensyvumo-valstybines-'
+         'reiksmes-keliuose-duomenys-2013-m',),
+    ]
+    assert [(x['maintainer_email'],) for x in package] == [
+        ('vytautas.timukas@lakd.lt',),
+    ]
+    package = [ckanapi.package_show(id=ids[1])]
+    assert [(x['title'],) for x in package] == [
+        ('Šilumos tiekimo licencijas turinčių įmonių sąrašas',),
+    ]
+    assert [(x['notes'],) for x in package] == [
+        ('Šilumos tiekimo licencijas turinčių įmonių sąrašas',),
+    ]
+    assert [(x['url'],) for x in package] == [
+        ('http://www.vkekk.lt/siluma/Puslapiai/'
+         'licencijavimas/licenciju-turetojai.aspx',),
+    ]
+    assert [(x['maintainer_email'],) for x in package] == [
+        ('jonaiste.jusionyte@regula.lt',),
+    ]
     tags = ckanapi.package_show(id=ids[0])['tags']
     assert sorted([x['name'] for x in tags]) == [
                        'eismo intensyvumas',
