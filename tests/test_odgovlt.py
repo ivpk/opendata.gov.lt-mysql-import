@@ -16,8 +16,6 @@ from ckanext.harvest.tests.factories import (
                           HarvestObjectObj)
 from ckanext.harvest.tests.lib import run_harvest
 from ckan.tests.helpers import reset_db
-from ckan.logic import get_action
-from ckan import model
 import ckan.lib.search.index
 import ckan.config.middleware
 import ckan.model
@@ -33,6 +31,7 @@ import webtest
 
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
+from odgovlt import CkanAPI
 
 
 class CKANTestApp(webtest.TestApp):
@@ -164,12 +163,9 @@ def test_OdgovltHarvester(app, db, mocker):
         '2014 m. vidutinio metinio paros eismo intensyvumo duomenys',
     ]
     clause = db.meta.tables['t_rinkmena'].select()
-    database_data = {}
     database_data_list = []
     for row in db.engine.execute(clause):
-        for row_name in row.keys():
-            database_data[row_name] = row[row_name]
-        database_data_list.append(database_data.copy())
+        database_data_list.append(dict(row))
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
@@ -203,13 +199,18 @@ def test_OdgovltHarvester(app, db, mocker):
     assert result['report_status'] == 'added'
     assert result['errors'] == []
     assert was_last_job_considered_error_free()
-    tag1 = database_data_list[0]['R_ZODZIAI']
-    tag2 = database_data_list[1]['R_ZODZIAI']
-    tag_1 = tag1.lower().replace(u'\u200b', '').split(',')
-    tag_2 = tag2.lower().replace(u'\u200b', '').split(',')
-    tag = tag_1 + tag_2
-    context = {'model': model, 'session': model.Session, 'ignore_auth': True}
-    tag_list = get_action('tag_list')(context, {})
-    assert tag_list
-    assert isinstance(tag_list, list)
-    assert set(tag) == set(tag_list)
+    ckanapi = CkanAPI()
+    ids = []
+    for x in ckanapi.package_list():
+        ids.append(x)
+    tags = ckanapi.package_show(id=ids[0])['tags']
+    assert sorted([x['name'] for x in tags]) == [
+                       'eismo intensyvumas',
+                       'keliai']
+    tags = ckanapi.package_show(id=ids[1])['tags']
+    assert sorted([x['name'] for x in tags]) == [
+                       'licencijos',
+                       'licencijuojamos veiklos teritorija',
+                       'šiluma',
+                       'šilumos tiekimo licencijas turinčių įmonių sąrašas',
+                       'šilumos tiekėjai']

@@ -10,6 +10,7 @@ from ckanext.harvest.harvesters.base import HarvesterBase
 import json
 from datetime import datetime
 from ckan.logic import get_action
+from ckan.plugins import toolkit
 from ckan import model
 import re
 import string
@@ -48,6 +49,16 @@ def get_package_tags(r_zodziai):
     return name_list
 
 
+class CkanAPI(object):
+    """Wrapper around CKAN API actions.
+    See: http://docs.ckan.org/en/latest/api/index.html#action-api-reference
+    """
+
+    def __getattr__(self, name):
+        return lambda context={}, \
+                      **kwargs: toolkit.get_action(name)(context, kwargs)
+
+
 class DatetimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
@@ -84,10 +95,9 @@ class OdgovltHarvester(HarvesterBase):
 
         clause = Tables.rinkmena.select()
         ids = []
-        database_data = dict()
+        database_data = {}
         for row in con.execute(clause):
-            for row_name in row.keys():
-                database_data[row_name] = row[row_name]
+            database_data = dict(row)
             id = database_data['ID']
             obj = HarvestObject(
                          guid=id,
