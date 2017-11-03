@@ -135,6 +135,7 @@ def test_OdgovltHarvester(app, db, mocker):
                      'licencijos,'
                      'licencijuojamos veiklos teritorija',
         'K_EMAIL': 'testas1@testas1.com',
+        'STATUSAS': 'U',
     })
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
@@ -143,6 +144,25 @@ def test_OdgovltHarvester(app, db, mocker):
         'TINKLAPIS': 'http://www.testas2.lt',
         'R_ZODZIAI': 'keliai,eismo intensyvumas',
         'K_EMAIL': 'testas2@testas2.com',
+        'STATUSAS': 'U',
+    })
+
+    db.engine.execute(db.meta.tables['t_user'].insert(), {
+        'LOGIN': 'User1',
+        'PASS': 'secret123',
+        'EMAIL': 'testas1@testas1.com',
+        'TELEFONAS': '+37000000000',
+        'FIRST_NAME': 'Jonas',
+        'LAST_NAME': 'Jonaitis',
+    })
+
+    db.engine.execute(db.meta.tables['t_user'].insert(), {
+        'LOGIN': 'User2',
+        'PASS': 'secret123',
+        'EMAIL': 'testas2@testas2.com',
+        'TELEFONAS': '+37000000000',
+        'FIRST_NAME': 'Tomas',
+        'LAST_NAME': 'Tomauskas',
     })
 
     source = HarvestSourceObj(url='sqlite://', source_type='opendata-gov-lt')
@@ -158,6 +178,13 @@ def test_OdgovltHarvester(app, db, mocker):
     ]
     clause = db.meta.tables['t_rinkmena'].select()
     database_data_list = [dict(row) for row in db.engine.execute(clause)]
+    conn = db.engine.connect()
+    user1 = harvester.sync_user(1, conn)
+    user2 = harvester.sync_user(2, conn)
+    assert user1['fullname'] == 'Jonas Jonaitis'
+    assert user2['fullname'] == 'Tomas Tomauskas'
+    database_data_list[0]['USER_NAME'] = user1['fullname']
+    database_data_list[1]['USER_NAME'] = user2['fullname']
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,

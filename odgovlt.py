@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData
+import sqlalchemy as sa
 from ckanext.harvest.model import HarvestObject
 import logging
 from ckanext.harvest.harvesters.base import HarvesterBase
@@ -14,6 +15,8 @@ from ckan.plugins import toolkit
 from ckan import model
 import re
 import string
+import unidecode
+import itertools
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +29,41 @@ def fixcase(value):
         return value[0].lower() + value[1:]
     else:
         return value
+
+
+def slugify(title=None, length=90):
+    if not title:
+        return ''
+
+    # Replace all non-ascii characters to ascii equivalents.
+    slug = unidecode.unidecode(title)
+
+    # Make slug.
+    slug = str(re.sub(r'[^\w\s-]', '', slug).strip().lower())
+    slug = re.sub(r'[-\s]+', '-', slug)
+
+    # Make sure, that slug is not longer that specied in `length`.
+    if len(slug) > length:
+        left = []
+        right = []
+        words = slug.split('-')
+        split = int(len(words) * .6)
+        index = itertools.izip_longest(
+            ((i, left) for i in range(split)),
+            ((i, right) for i in range(len(words) - 1, split - 1, -1)),
+        )
+        index = (i for i in
+                 itertools.chain.from_iterable(index) if i is not None)
+        total = 0
+        for k, (i, q) in zip(itertools.chain([0], itertools.count(2)), index):
+            if total + len(words[i]) + k > length:
+                break
+            else:
+                q.append(words[i])
+                total += len(words[i])
+        slug = '-'.join(left) + '--' + '-'.join(right)
+
+    return slug
 
 
 def tagify(tag):
@@ -73,10 +111,64 @@ class DatetimeEncoder(json.JSONEncoder):
 
 class OdgovltHarvester(HarvesterBase):
 
-    def _connect_to_database(self, dburi):
-        con = create_engine(dburi)
+    def _connect_to_database(self, dburl):
+        con = create_engine(dburl)
         meta = MetaData(bind=con, reflect=True)
         return con, meta
+
+    def sync_importbot_user(self):
+        from ckan import model
+
+        username = 'importbot'
+        user = model.User.by_name(username)
+
+        if not user:
+            # TODO: How to deal with passwords?
+            user = model.User(name=username, password='secret123')
+            user.sysadmin = True
+            model.Session.add(user)
+            model.repo.commit_and_remove()
+
+        return self.api.user_show(id=username)
+
+    def sync_user(self, user_id, conn):
+        self.api = CkanAPI()
+        self.importbot = self.sync_importbot_user()
+        user = conn.execute(
+            sa.select([self.t.user]).where(self.t.user.c.ID == user_id)
+        ).fetchone()
+        if user:
+            user_data = {
+                'name': slugify(user.LOGIN),
+                # TODO: Passwrods are encoded with md5 hash, I need to look if
+                #       CKAN supports md5 hashed passwords. If not,
+                #       then users will have to change their passwords.
+                'email': user.EMAIL,
+                'password': user.PASS,
+                'fullname': ' '.join([user.FIRST_NAME, user.LAST_NAME]),
+            }
+        else:
+            user_data = {
+                'name': 'unknown',
+                # TODO: What email should I use?
+                'email': 'unknown@example.com',
+                # TODO: Maybe dynamically generate a password?
+                'password': 'secret123',
+                'fullname': 'Unknown User',
+            }
+
+        ckan_user = next((
+            u for u in self.api.user_list(q=user_data['name'])
+            if u['name'] == user_data['name']
+        ), None)
+
+        if ckan_user is None:
+            context = {'user': self.importbot['name']}
+            ckan_user = self.api.user_create(context, **user_data)
+
+        user_data['id'] = ckan_user['id']
+
+        return user_data
 
     def info(self):
         return {
@@ -91,14 +183,24 @@ class OdgovltHarvester(HarvesterBase):
         con, meta = self._connect_to_database(harvest_job.source.url)
 
         class Tables(object):
+            user = meta.tables['t_user']
+            istaiga = meta.tables['t_istaiga']
             rinkmena = meta.tables['t_rinkmena']
 
-        clause = Tables.rinkmena.select()
+        self.t = Tables
+
         ids = []
         database_data = {}
-        for row in con.execute(clause):
+        query = (
+            sa.select([self.t.rinkmena]).
+            where(self.t.rinkmena.c.STATUSAS == 'U')
+        )
+        for row in con.execute(query):
             database_data = dict(row)
             id = database_data['ID']
+            conn = con.connect()
+            user = self.sync_user(row.USER_ID, conn)
+            database_data['USER_NAME'] = user['fullname']
             obj = HarvestObject(
                          guid=id,
                          job=harvest_job,
@@ -126,6 +228,7 @@ class OdgovltHarvester(HarvesterBase):
             'notes': data_to_import['SANTRAUKA'],
             'url': data_to_import['TINKLAPIS'],
             'tags': get_package_tags(data_to_import['R_ZODZIAI']),
+            'maintainer': data_to_import['USER_NAME'],
             'maintainer_email': data_to_import['K_EMAIL'],
             'owner_org': local_org,
         }
