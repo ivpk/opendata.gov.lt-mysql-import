@@ -222,11 +222,13 @@ class OdgovltHarvester(HarvesterBase):
                            base_context.copy(),
                            {'id': harvest_object.source.id})
         local_org = source_dataset.get('owner_org')
+        pavadinimas = data_to_import['PAVADINIMAS']
         package_dict = {
             'id': harvest_object.guid,
-            'title': data_to_import['PAVADINIMAS'],
+            'title': pavadinimas,
             'notes': data_to_import['SANTRAUKA'],
             'url': data_to_import['TINKLAPIS'],
+            'name': slugify(pavadinimas),
             'tags': get_package_tags(data_to_import['R_ZODZIAI']),
             'maintainer': data_to_import['USER_NAME'],
             'maintainer_email': data_to_import['K_EMAIL'],

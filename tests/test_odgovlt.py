@@ -32,6 +32,7 @@ import webtest
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
 from odgovlt import CkanAPI
+from odgovlt import slugify
 
 
 class CKANTestApp(webtest.TestApp):
@@ -178,6 +179,14 @@ def test_OdgovltHarvester(app, db, mocker):
         'Testinė organizacija nr. 1',
         'Testinė organizacija nr. 2',
     ]
+    title = (
+        'Radiacinės saugos centro išduotų galiojančių '
+        'licencijų verstis veikla su jonizuojančiosios spinduliuotės '
+        'šaltiniais duomenys'
+    )
+    slug = slugify(title, length=42)
+    assert len(slug) <= 42
+    assert slug == 'radiacines-saugos--duomenys-saltiniais'
     clause = db.meta.tables['t_rinkmena'].select()
     database_data_list = [dict(row) for row in db.engine.execute(clause)]
     conn = db.engine.connect()
