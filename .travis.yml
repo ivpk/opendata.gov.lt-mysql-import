@@ -4,7 +4,6 @@ python:
 install:
   - pip install flake8 docutils
 script:
-  - curl -sSL https://raw.githubusercontent.com/moliware/travis-solr/master/travis-solr.sh | SOLR_VERSION=5.3.1 SOLR_COLLECTION_CONF=solr/ bash
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
