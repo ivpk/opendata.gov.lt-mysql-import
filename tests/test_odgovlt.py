@@ -136,6 +136,7 @@ def test_OdgovltHarvester(app, db, mocker):
                      'licencijuojamos veiklos teritorija',
         'K_EMAIL': 'testas1@testas1.com',
         'STATUSAS': 'U',
+        'USER_ID': 1,
     })
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
@@ -145,6 +146,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'R_ZODZIAI': 'keliai,eismo intensyvumas',
         'K_EMAIL': 'testas2@testas2.com',
         'STATUSAS': 'U',
+        'USER_ID': 2,
     })
 
     db.engine.execute(db.meta.tables['t_user'].insert(), {
@@ -181,8 +183,6 @@ def test_OdgovltHarvester(app, db, mocker):
     conn = db.engine.connect()
     user1 = harvester.sync_user(1, conn)
     user2 = harvester.sync_user(2, conn)
-    assert user1['fullname'] == 'Jonas Jonaitis'
-    assert user2['fullname'] == 'Tomas Tomauskas'
     database_data_list[0]['USER_NAME'] = user1['fullname']
     database_data_list[1]['USER_NAME'] = user2['fullname']
     obj1 = HarvestObjectObj(
@@ -226,10 +226,12 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['title'] == 'Testinė organizacija nr. 1'
     assert package1['notes'] == 'Testas nr. 1'
     assert package1['url'] == 'http://www.testas1.lt'
+    assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
     assert package2['title'] == 'Testinė organizacija nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
+    assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
     tags1 = package1['tags']
     tags2 = package2['tags']
