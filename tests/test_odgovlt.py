@@ -127,7 +127,7 @@ def test_OdgovltHarvester(app, db, mocker):
     mocker.patch('ckan.lib.search.index.make_connection')
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
-        'PAVADINIMAS': 'Testinė organizacija nr. 1',
+        'PAVADINIMAS': 'Testinė rinkmena nr. 1',
         'SANTRAUKA': 'Testas nr. 1',
         'TINKLAPIS': 'http://www.testas1.lt',
         'R_ZODZIAI': '​Šilumos tiekimo licencijas turinčių įmonių sąrašas,'
@@ -138,16 +138,18 @@ def test_OdgovltHarvester(app, db, mocker):
         'K_EMAIL': 'testas1@testas1.com',
         'STATUSAS': 'U',
         'USER_ID': 1,
+        'istaiga_id': 1,
     })
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
-        'PAVADINIMAS': 'Testinė organizacija nr. 2',
+        'PAVADINIMAS': 'Testinė rinkmena nr. 2',
         'SANTRAUKA': 'Testas nr. 2',
         'TINKLAPIS': 'http://www.testas2.lt',
         'R_ZODZIAI': 'keliai,eismo intensyvumas',
         'K_EMAIL': 'testas2@testas2.com',
         'STATUSAS': 'U',
         'USER_ID': 2,
+        'istaiga_id': 2,
     })
 
     db.engine.execute(db.meta.tables['t_user'].insert(), {
@@ -168,6 +170,18 @@ def test_OdgovltHarvester(app, db, mocker):
         'LAST_NAME': 'Tomauskas',
     })
 
+    db.engine.execute(db.meta.tables['t_istaiga'].insert(), {
+        'PAVADINIMAS': 'Testinė organizacija nr. 1',
+        'KODAS': 888,
+        'ADRESAS': 'Testinė g. 9'
+    })
+
+    db.engine.execute(db.meta.tables['t_istaiga'].insert(), {
+        'PAVADINIMAS': 'Testinė organizacija nr. 2',
+        'KODAS': 777,
+        'ADRESAS': 'Testinė g. 91'
+    })
+
     source = HarvestSourceObj(url='sqlite://', source_type='opendata-gov-lt')
     job = HarvestJobObj(source=source)
     harvester = OdgovltHarvester()
@@ -176,8 +190,8 @@ def test_OdgovltHarvester(app, db, mocker):
     assert [json.loads(
                ckanext.harvest.model.HarvestObject.get(x).content
                )['PAVADINIMAS'] for x in obj_ids] == [
-        'Testinė organizacija nr. 1',
-        'Testinė organizacija nr. 2',
+        'Testinė rinkmena nr. 1',
+        'Testinė rinkmena nr. 2',
     ]
     title = (
         'Radiacinės saugos centro išduotų galiojančių '
@@ -192,8 +206,12 @@ def test_OdgovltHarvester(app, db, mocker):
     conn = db.engine.connect()
     user1 = harvester.sync_user(1, conn)
     user2 = harvester.sync_user(2, conn)
-    database_data_list[0]['USER_NAME'] = user1['fullname']
-    database_data_list[1]['USER_NAME'] = user2['fullname']
+    database_data_list[0]['VARDAS'] = user1['fullname']
+    database_data_list[1]['VARDAS'] = user2['fullname']
+    organization1 = harvester.sync_organization(1, conn)
+    organization2 = harvester.sync_organization(2, conn)
+    database_data_list[0]['ORGANIZACIJA'] = organization1['name']
+    database_data_list[1]['ORGANIZACIJA'] = organization2['name']
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
@@ -232,16 +250,18 @@ def test_OdgovltHarvester(app, db, mocker):
     assert len(ids) == 3
     package1 = ckanapi.package_show(id=ids[0])
     package2 = ckanapi.package_show(id=ids[1])
-    assert package1['title'] == 'Testinė organizacija nr. 1'
+    assert package1['title'] == 'Testinė rinkmena nr. 1'
     assert package1['notes'] == 'Testas nr. 1'
     assert package1['url'] == 'http://www.testas1.lt'
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
-    assert package2['title'] == 'Testinė organizacija nr. 2'
+    assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
+    assert package2['title'] == 'Testinė rinkmena nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
+    assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
     tags1 = package1['tags']
     tags2 = package2['tags']
     assert sorted([x['name'] for x in tags1]) == [

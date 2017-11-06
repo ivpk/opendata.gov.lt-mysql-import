@@ -10,15 +10,18 @@ import logging
 from ckanext.harvest.harvesters.base import HarvesterBase
 import json
 from datetime import datetime
-from ckan.logic import get_action
+from ckan.logic import NotFound
 from ckan.plugins import toolkit
-from ckan import model
 import re
 import string
 import unidecode
 import itertools
 
 log = logging.getLogger(__name__)
+
+SOURCE_ID_KEY = 'Išorinis ID'
+CODE_KEY = 'Kodas'
+ADDRESS_KEY = 'Adresas'
 
 
 def fixcase(value):
@@ -170,6 +173,52 @@ class OdgovltHarvester(HarvesterBase):
 
         return user_data
 
+    def sync_organization(self, istaiga_id, conn):
+        organization = conn.execute(
+            sa.select(
+               [self.t.istaiga]).where(self.t.istaiga.c.ID == istaiga_id)
+        ).fetchone()
+
+        if organization:
+            organization_data = {
+                # PAVADINIMAS
+                'name': slugify(organization.PAVADINIMAS),
+                'title': organization.PAVADINIMAS,
+
+                'state': 'active',
+
+                'extras': [
+                    # ID
+                    {'key': SOURCE_ID_KEY, 'value': organization.ID},
+
+                    # KODAS
+                    {'key': CODE_KEY, 'value': organization.KODAS},
+
+                    # ADRESAS
+                    {'key': ADDRESS_KEY, 'value': organization.ADRESAS},
+                ],
+            }
+        else:
+            organization_data = {
+                'name': 'unknown',
+                'title': 'Unknown organization',
+                'state': 'active',
+            }
+
+        try:
+            ckan_organization = \
+                self.api.organization_show(id=organization_data['name'])
+        except NotFound:
+            ckan_organization = None
+
+        if ckan_organization is None:
+            context = {'user': self.importbot['name']}
+            ckan_organization = \
+                self.api.organization_create(context, **organization_data)
+
+        organization_data['id'] = ckan_organization['id']
+        return organization_data
+
     def info(self):
         return {
             'name': 'opendata-gov-lt',
@@ -191,6 +240,7 @@ class OdgovltHarvester(HarvesterBase):
 
         ids = []
         database_data = {}
+        conn = con.connect()
         query = (
             sa.select([self.t.rinkmena]).
             where(self.t.rinkmena.c.STATUSAS == 'U')
@@ -198,9 +248,16 @@ class OdgovltHarvester(HarvesterBase):
         for row in con.execute(query):
             database_data = dict(row)
             id = database_data['ID']
-            conn = con.connect()
             user = self.sync_user(row.USER_ID, conn)
-            database_data['USER_NAME'] = user['fullname']
+            organization = self.sync_organization(row.istaiga_id, conn)
+            database_data['VARDAS'] = user['fullname']
+            database_data['ORGANIZACIJA'] = organization['name']
+            self.api.organization_member_create(
+                {'user': self.importbot['name']},
+                id=organization['name'],
+                username=user['name'],
+                role='editor',
+            )
             obj = HarvestObject(
                          guid=id,
                          job=harvest_job,
@@ -215,13 +272,7 @@ class OdgovltHarvester(HarvesterBase):
         return True
 
     def import_stage(self, harvest_object):
-        base_context = {'model': model, 'session': model.Session,
-                        'user': self._get_user_name()}
         data_to_import = json.loads(harvest_object.content)
-        source_dataset = get_action('package_show')(
-                           base_context.copy(),
-                           {'id': harvest_object.source.id})
-        local_org = source_dataset.get('owner_org')
         pavadinimas = data_to_import['PAVADINIMAS']
         package_dict = {
             'id': harvest_object.guid,
@@ -230,8 +281,8 @@ class OdgovltHarvester(HarvesterBase):
             'url': data_to_import['TINKLAPIS'],
             'name': slugify(pavadinimas, length=42),
             'tags': get_package_tags(data_to_import['R_ZODZIAI']),
-            'maintainer': data_to_import['USER_NAME'],
+            'maintainer': data_to_import['VARDAS'],
             'maintainer_email': data_to_import['K_EMAIL'],
-            'owner_org': local_org,
+            'owner_org': data_to_import['ORGANIZACIJA'],
         }
         return self._create_or_update_package(package_dict, harvest_object)
