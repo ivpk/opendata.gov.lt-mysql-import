@@ -228,7 +228,7 @@ class OdgovltHarvester(HarvesterBase):
             'title': pavadinimas,
             'notes': data_to_import['SANTRAUKA'],
             'url': data_to_import['TINKLAPIS'],
-            'name': slugify(pavadinimas),
+            'name': slugify(pavadinimas, length=42),
             'tags': get_package_tags(data_to_import['R_ZODZIAI']),
             'maintainer': data_to_import['USER_NAME'],
             'maintainer_email': data_to_import['K_EMAIL'],
