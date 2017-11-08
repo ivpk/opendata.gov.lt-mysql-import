@@ -6,8 +6,8 @@ install:
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
   - sudo service jetty start
-  - sudo service jetty status
 script:
+  - cd /etc/solr
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
