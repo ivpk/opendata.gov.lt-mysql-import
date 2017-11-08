@@ -4,8 +4,8 @@ python:
 install:
   - pip install flake8 docutils
   - sudo apt-get install oracle-java8-set-default
-script:
   - cd /opt
+script:
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
