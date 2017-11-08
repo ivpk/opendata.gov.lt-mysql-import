@@ -7,6 +7,8 @@ install:
 before_script:
   - export path=/etc/default/jetty
   - sudo sed -i 's/NO_START=1/NO_START=0/g' $path
+  - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' $path
+  - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' $path
   - sudo service jetty start
 script:
   - cat /etc/default/jetty
