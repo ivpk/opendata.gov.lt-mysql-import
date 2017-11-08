@@ -28,11 +28,14 @@ import pylons
 import pytest
 import sqlalchemy as sa
 import webtest
+import datetime
 
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
 from odgovlt import CkanAPI
 from odgovlt import slugify
+from odgovlt import get_package_tags
+from odgovlt import fixcase
 
 
 class CKANTestApp(webtest.TestApp):
@@ -197,18 +200,31 @@ def test_OdgovltHarvester(app, db, mocker):
         'licencijų verstis veikla su jonizuojančiosios spinduliuotės '
         'šaltiniais duomenys'
     )
-    slug = slugify(title, length=42)
-    assert len(slug) <= 42
-    assert slug == 'radiacines-saugos--duomenys-saltiniais'
+    slug1 = slugify(title, length=42)
+    assert len(slug1) <= 42
+    assert slug1 == 'radiacines-saugos--duomenys-saltiniais'
+    slug2 = slugify()
+    assert slug2 == ''
+    test_dict = {
+         'user': 'test1',
+         'pass': 'test2',
+         'date': datetime.datetime(1985,  10, 20)}
+    after_encoder = json.loads(json.dumps(test_dict, cls=DatetimeEncoder))
+    assert isinstance(after_encoder, dict)
+    assert test_dict['user'] == after_encoder['user']
+    assert test_dict['pass'] == after_encoder['pass']
+    assert after_encoder['date'] == '1985-10-20T00:00:00'
     clause = db.meta.tables['t_rinkmena'].select()
     database_data_list = [dict(row) for row in db.engine.execute(clause)]
     conn = db.engine.connect()
     user1 = harvester.sync_user(1, conn)
     user2 = harvester.sync_user(2, conn)
+    user3 = harvester.sync_user(3, conn)
     database_data_list[0]['VARDAS'] = user1['fullname']
     database_data_list[1]['VARDAS'] = user2['fullname']
     organization1 = harvester.sync_organization(1, conn)
     organization2 = harvester.sync_organization(2, conn)
+    organization3 = harvester.sync_organization(3, conn)
     database_data_list[0]['ORGANIZACIJA'] = organization1['name']
     database_data_list[1]['ORGANIZACIJA'] = organization2['name']
     obj1 = HarvestObjectObj(
@@ -261,6 +277,20 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
     assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
+    assert user3['fullname'] == 'Unknown User'
+    assert organization3['title'] == 'Unknown organization'
+    fixcase_test = fixcase('Testas9')
+    assert fixcase_test == 'testas9'
+    tags_test = get_package_tags(
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,'
+                    'testas2 testas3, testas4 testas5; testas6')
+    assert tags_test == [
+                   'testas2 testas3',
+                   'testas4 testas5',
+                   'testas6']
     tags1 = package1['tags']
     tags2 = package2['tags']
     assert sorted([x['name'] for x in tags1]) == [
