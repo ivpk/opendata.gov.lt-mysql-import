@@ -12,7 +12,6 @@ before_script:
   - wget -O schema.xml https://github.com/ckan/ckan/blob/master/ckan/config/solr/schema.xml?raw=true && sudo mv schema.xml /etc/solr/conf/schema.xml
   - sudo service jetty start
 script:
-  - ls
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
