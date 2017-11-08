@@ -9,7 +9,7 @@ before_script:
   - sudo sed -i 's/NO_START=1/NO_START=0/g' $path
   - sudo service jetty start
 script:
-  - cat jetty
+  - cat /etc/default/jetty
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
