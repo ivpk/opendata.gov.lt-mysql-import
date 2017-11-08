@@ -205,15 +205,6 @@ def test_OdgovltHarvester(app, db, mocker):
     assert slug1 == 'radiacines-saugos--duomenys-saltiniais'
     slug2 = slugify()
     assert slug2 == ''
-    test_dict = {
-         'user': 'test1',
-         'pass': 'test2',
-         'date': datetime.datetime(1985,  10, 20)}
-    after_encoder = json.loads(json.dumps(test_dict, cls=DatetimeEncoder))
-    assert isinstance(after_encoder, dict)
-    assert test_dict['user'] == after_encoder['user']
-    assert test_dict['pass'] == after_encoder['pass']
-    assert after_encoder['date'] == '1985-10-20T00:00:00'
     clause = db.meta.tables['t_rinkmena'].select()
     database_data_list = [dict(row) for row in db.engine.execute(clause)]
     conn = db.engine.connect()
