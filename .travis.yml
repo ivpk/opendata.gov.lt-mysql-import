@@ -10,7 +10,7 @@ before_script:
   - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' $path
   - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' $path
   - sudo mv /etc/solr/conf/schema.xml /etc/solr/conf/schema.xml.bak
-  - sudo ln -s schema.xml /etc/solr/conf/schema.xml
+  - sudo cp schema.xml /etc/solr/conf/schema.xml
   - sudo service jetty start
 script:
   - flake8 odgovlt.py
