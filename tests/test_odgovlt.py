@@ -124,7 +124,7 @@ def test_OdgovltHarvester(app, db, mocker):
     mocker.patch(
             'odgovlt.OdgovltHarvester._connect_to_database',
             return_value=db)
-    mocker.patch('ckan.lib.search.index.make_connection')
+    #mocker.patch('ckan.lib.search.index.make_connection')
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
         'PAVADINIMAS': 'Testinė rinkmena nr. 1',
