@@ -273,4 +273,3 @@ def test_OdgovltHarvester(app, db, mocker):
     assert sorted([x['name'] for x in tags2]) == [
                        'eismo intensyvumas',
                        'keliai']
-    print ckanapi.package_show(id=ids[0])
