@@ -28,7 +28,6 @@ import pylons
 import pytest
 import sqlalchemy as sa
 import webtest
-import datetime
 
 from odgovlt import OdgovltHarvester
 from odgovlt import DatetimeEncoder
