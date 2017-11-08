@@ -1,16 +1,9 @@
 language: python
 python:
   - "2.7"
-before_install:
-  - sudo apt-get install oracle-java8-set-default
-  - path=$(pwd)
-  - cd /opt
-  - sudo wget http://apache.mirror.vu.lt/apache/lucene/solr/7.1.0/solr-7.1.0.tgz
-  - sudo tar xzf solr-7.1.0.tgz solr-7.1.0/bin/install_solr_service.sh --strip-components=2
-  - sudo ./install_solr_service.sh solr-7.1.0.tgz
-  - cd $path
 install:
   - pip install flake8 docutils
+  - sudo apt-get install solr-jetty openjdk-6-jdk
 script:
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
