@@ -7,7 +7,9 @@ install:
 before_script:
   - sudo service jetty start
 script:
-  - cd /etc/solr
+  - echo NO_START=0 >> /ect/default/jetty8
+  - echo JETTY_HOST=127.0.0.1 >> /etc/default/jetty8
+  - echo JETTY_PORT=8983 >> /etc/default/jetty8
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
