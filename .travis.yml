@@ -5,7 +5,8 @@ install:
   - pip install flake8 docutils
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
-  - cd /etc/default
+  - export path=/etc/default/jetty
+  - sed -i 's/NO_START=1/NO_START=0/g' $path
   - sudo service jetty start
 script:
   - cat jetty
