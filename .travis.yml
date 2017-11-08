@@ -2,8 +2,8 @@ language: python
 python:
   - "2.7"
 install:
-  - pip install flake8 docutils solr
-  - apt-get install oracle-java8-set-default
+  - pip install flake8 docutils
+  - sudo apt-get install oracle-java8-set-default
 script:
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
