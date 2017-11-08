@@ -5,11 +5,10 @@ install:
   - pip install flake8 docutils
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
-  - sudo echo NO_START=0 >> /ect/default/jetty8
-  - sudo echo JETTY_HOST=127.0.0.1 >> /etc/default/jetty8
-  - sudo echo JETTY_PORT=8983 >> /etc/default/jetty8
+  - cd /etc/default
   - sudo service jetty start
 script:
+  - ls
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
