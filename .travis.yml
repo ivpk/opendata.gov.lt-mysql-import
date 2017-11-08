@@ -8,7 +8,7 @@ before_script:
   - cd /etc/default
   - sudo service jetty start
 script:
-  - ls
+  - cat jetty
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null
   - flake8 tests
