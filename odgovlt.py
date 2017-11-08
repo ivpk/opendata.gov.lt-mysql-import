@@ -252,12 +252,12 @@ class OdgovltHarvester(HarvesterBase):
             organization = self.sync_organization(row.istaiga_id, conn)
             database_data['VARDAS'] = user['fullname']
             database_data['ORGANIZACIJA'] = organization['name']
-            self.api.organization_member_create(
-                {'user': self.importbot['name']},
-                id=organization['name'],
-                username=user['name'],
-                role='editor',
-            )
+            #self.api.organization_member_create(
+            #    {'user': self.importbot['name']},
+            #    id=organization['name'],
+            #    username=user['name'],
+            #    role='editor',
+            #)
             obj = HarvestObject(
                          guid=id,
                          job=harvest_job,
@@ -283,6 +283,6 @@ class OdgovltHarvester(HarvesterBase):
             'tags': get_package_tags(data_to_import['R_ZODZIAI']),
             'maintainer': data_to_import['VARDAS'],
             'maintainer_email': data_to_import['K_EMAIL'],
-            'owner_org': data_to_import['ORGANIZACIJA'],
+            #'owner_org': data_to_import['ORGANIZACIJA'],
         }
         return self._create_or_update_package(package_dict, harvest_object)
