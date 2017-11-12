@@ -9,17 +9,6 @@ import json
 import logging
 import os
 
-from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
-from ckanext.harvest.tests.factories import (
-                          HarvestSourceObj,
-                          HarvestJobObj,
-                          HarvestObjectObj)
-from ckanext.harvest.tests.lib import run_harvest
-from ckan.tests.helpers import reset_db
-import ckan.lib.search.index
-import ckan.config.middleware
-import ckan.model
-import ckanext.harvest.model
 import mock
 import pkg_resources as pres
 import psycopg2
@@ -29,12 +18,23 @@ import pytest
 import sqlalchemy as sa
 import webtest
 
-from odgovlt import OdgovltHarvester
-from odgovlt import DatetimeEncoder
+import ckan.config.middleware
+import ckan.lib.search.index
+import ckan.model
+import ckanext.harvest.model
+from ckan.tests.helpers import reset_db
+from ckanext.harvest.harvesters.ckanharvester import CKANHarvester
+from ckanext.harvest.tests.factories import HarvestJobObj
+from ckanext.harvest.tests.factories import HarvestObjectObj
+from ckanext.harvest.tests.factories import HarvestSourceObj
+from ckanext.harvest.tests.lib import run_harvest
+
 from odgovlt import CkanAPI
-from odgovlt import slugify
-from odgovlt import get_package_tags
+from odgovlt import DatetimeEncoder
+from odgovlt import OdgovltHarvester
 from odgovlt import fixcase
+from odgovlt import get_package_tags
+from odgovlt import slugify
 
 
 class CKANTestApp(webtest.TestApp):
@@ -80,10 +80,8 @@ def db():
 @pytest.fixture
 def postgres():
     dbname = 'odgovlt_mysql_import_tests'
-    with contextlib.closing(psycopg2.connect(
-                         'postgresql:///postgres')) as conn:
-        conn.set_isolation_level(
-                         psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+    with contextlib.closing(psycopg2.connect('postgresql:///postgres')) as conn:
+        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         with contextlib.closing(conn.cursor()) as curs:
             curs.execute('DROP DATABASE IF EXISTS ' + dbname)
             curs.execute('CREATE DATABASE ' + dbname)
@@ -98,14 +96,13 @@ def app(postgres, mocker, caplog):
     caplog.set_level(logging.WARNING, logger='vdm')
     caplog.set_level(logging.WARNING, logger='pysolr')
 
-    mocker.patch('ckan.lib.search.check_solr_schema_version')
-
     global_config = {
         '__file__': '',
         'here': os.path.dirname(__file__),
         'ckan.site_url': 'http://localhost',
-        'sqlalchemy.url': postgres,
         'ckan.plugins': 'harvest odgovlt_harvester',
+        'sqlalchemy.url': postgres,
+        # 'solr_url': 'http://127.0.0.1:8983/solr/ckan',
     }
     app_config = {
         'who.config_file': pres.resource_filename('ckan.config', 'who.ini'),
@@ -123,9 +120,7 @@ def app(postgres, mocker, caplog):
 
 
 def test_OdgovltHarvester(app, db, mocker):
-    mocker.patch(
-            'odgovlt.OdgovltHarvester._connect_to_database',
-            return_value=db)
+    mocker.patch('odgovlt.OdgovltHarvester._connect_to_database', return_value=db)
 
     db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
         'PAVADINIMAS': 'Testinė rinkmena nr. 1',
@@ -188,9 +183,7 @@ def test_OdgovltHarvester(app, db, mocker):
     harvester = OdgovltHarvester()
     obj_ids = harvester.gather_stage(job)
     assert job.gather_errors == []
-    assert [json.loads(
-               ckanext.harvest.model.HarvestObject.get(x).content
-               )['PAVADINIMAS'] for x in obj_ids] == [
+    assert [json.loads(ckanext.harvest.model.HarvestObject.get(x).content)['PAVADINIMAS'] for x in obj_ids] == [
         'Testinė rinkmena nr. 1',
         'Testinė rinkmena nr. 2',
     ]
@@ -238,9 +231,7 @@ def test_OdgovltHarvester(app, db, mocker):
     assert obj1.package_id
     assert obj2.package_id
     reset_db()
-    results_by_guid = run_harvest(
-            url='sqlite://',
-            harvester=OdgovltHarvester())
+    results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
     assert result['report_status'] == 'added'
@@ -272,23 +263,27 @@ def test_OdgovltHarvester(app, db, mocker):
     fixcase_test = fixcase('Testas9')
     assert fixcase_test == 'testas9'
     tags_test = get_package_tags(
-                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,'
-                    'testas2 testas3, testas4 testas5; testas6')
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,'
+        'testas2 testas3, testas4 testas5; testas6'
+    )
     assert tags_test == [
-                   'testas2 testas3',
-                   'testas4 testas5',
-                   'testas6']
+        'testas2 testas3',
+        'testas4 testas5',
+        'testas6',
+    ]
     tags1 = package1['tags']
     tags2 = package2['tags']
     assert sorted([x['name'] for x in tags1]) == [
-                       'licencijos',
-                       'licencijuojamos veiklos teritorija',
-                       'šiluma',
-                       'šilumos tiekimo licencijas turinčių įmonių sąrašas',
-                       'šilumos tiekėjai']
+        'licencijos',
+        'licencijuojamos veiklos teritorija',
+        'šiluma',
+        'šilumos tiekimo licencijas turinčių įmonių sąrašas',
+        'šilumos tiekėjai',
+    ]
     assert sorted([x['name'] for x in tags2]) == [
-                       'eismo intensyvumas',
-                       'keliai']
+        'eismo intensyvumas',
+        'keliai',
+    ]

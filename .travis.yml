@@ -5,11 +5,10 @@ install:
   - pip install flake8 docutils
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
-  - export path=/etc/default/jetty
-  - sudo sed -i 's/NO_START=1/NO_START=0/g' $path
-  - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' $path
-  - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' $path
-  - wget -O schema.xml https://github.com/ckan/ckan/blob/master/ckan/config/solr/schema.xml?raw=true && sudo mv schema.xml /etc/solr/conf/schema.xml
+  - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
+  - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' /etc/default/jetty
+  - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' /etc/default/jetty
+  - sudo wget -O /etc/solr/conf/schema.xml https://raw.githubusercontent.com/ckan/ckan/master/ckan/config/solr/schema.xml
   - sudo service jetty start
 script:
   - flake8 odgovlt.py

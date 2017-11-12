@@ -2,20 +2,20 @@
 
 from __future__ import unicode_literals
 
-from sqlalchemy import create_engine
-from sqlalchemy import MetaData
-import sqlalchemy as sa
-from ckanext.harvest.model import HarvestObject
-import logging
-from ckanext.harvest.harvesters.base import HarvesterBase
+import datetime
+import itertools
 import json
-from datetime import datetime
-from ckan.logic import NotFound
-from ckan.plugins import toolkit
+import logging
 import re
 import string
+
+import sqlalchemy as sa
 import unidecode
-import itertools
+
+from ckan.logic import NotFound
+from ckan.plugins import toolkit
+from ckanext.harvest.harvesters.base import HarvesterBase
+from ckanext.harvest.model import HarvestObject
 
 log = logging.getLogger(__name__)
 
@@ -25,10 +25,7 @@ ADDRESS_KEY = 'Adresas'
 
 
 def fixcase(value):
-    if len(value) > 1 and \
-           value[:2].isalpha() and \
-           value[0].isupper() and \
-           value[1].islower():
+    if len(value) > 1 and value[:2].isalpha() and value[0].isupper() and value[1].islower():
         return value[0].lower() + value[1:]
     else:
         return value
@@ -84,7 +81,7 @@ def get_package_tags(r_zodziai):
             name = tagify(tag).lower()
 
             if len(name) > 100:
-                log.warn("skip very long tag: %r", tag)
+                log.warning("skip very long tag: %r", tag)
             else:
                 name_list.append(name)
     return name_list
@@ -96,13 +93,12 @@ class CkanAPI(object):
     """
 
     def __getattr__(self, name):
-        return lambda context={}, \
-                      **kwargs: toolkit.get_action(name)(context, kwargs)
+        return lambda context={}, **kwargs: toolkit.get_action(name)(context, kwargs)
 
 
 class DatetimeEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, datetime):
+        if isinstance(obj, datetime.datetime):
             try:
                 return obj.strftime('%Y-%m-%dT%H:%M:%S')
             except ValueError:
@@ -115,8 +111,8 @@ class DatetimeEncoder(json.JSONEncoder):
 class OdgovltHarvester(HarvesterBase):
 
     def _connect_to_database(self, dburl):
-        con = create_engine(dburl)
-        meta = MetaData(bind=con, reflect=True)
+        con = sa.create_engine(dburl)
+        meta = sa.MetaData(bind=con, reflect=True)
         return con, meta
 
     def sync_importbot_user(self):
@@ -174,10 +170,7 @@ class OdgovltHarvester(HarvesterBase):
         return user_data
 
     def sync_organization(self, istaiga_id, conn):
-        organization = conn.execute(
-            sa.select(
-               [self.t.istaiga]).where(self.t.istaiga.c.ID == istaiga_id)
-        ).fetchone()
+        organization = conn.execute(sa.select([self.t.istaiga]).where(self.t.istaiga.c.ID == istaiga_id)).fetchone()
 
         if organization:
             organization_data = {
@@ -213,8 +206,7 @@ class OdgovltHarvester(HarvesterBase):
 
         if ckan_organization is None:
             context = {'user': self.importbot['name']}
-            ckan_organization = \
-                self.api.organization_create(context, **organization_data)
+            ckan_organization = self.api.organization_create(context, **organization_data)
 
         organization_data['id'] = ckan_organization['id']
         return organization_data
@@ -258,12 +250,7 @@ class OdgovltHarvester(HarvesterBase):
                 username=user['name'],
                 role='editor',
             )
-            obj = HarvestObject(
-                         guid=id,
-                         job=harvest_job,
-                         content=json.dumps(
-                              database_data,
-                              cls=DatetimeEncoder))
+            obj = HarvestObject(guid=id, job=harvest_job, content=json.dumps(database_data, cls=DatetimeEncoder))
             obj.save()
             ids.append(obj.id)
         return ids
