@@ -3,6 +3,13 @@ python:
   - "2.7"
 install:
   - pip install flake8 docutils
+  - sudo apt-get install solr-jetty openjdk-6-jdk
+before_script:
+  - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
+  - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' /etc/default/jetty
+  - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' /etc/default/jetty
+  - sudo wget -O /etc/solr/conf/schema.xml https://raw.githubusercontent.com/ckan/ckan/master/ckan/config/solr/schema.xml
+  - sudo service jetty start
 script:
   - flake8 odgovlt.py
   - rst2html.py --strict README.rst /dev/null

@@ -17,3 +17,15 @@ Connection parameters to MySQL database should be specified as harvester URL,
 and it should looks like this::
 
     mysql+pymysql://usernaem:password@hostname/dbname?charset=utf8
+
+
+Development environment
+=======================
+
+Initialize deveopment environment::
+
+    make
+
+You can run SOLR like this::
+
+    sudo docker-compose up -d
