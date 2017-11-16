@@ -93,7 +93,10 @@ class CkanAPI(object):
     """
 
     def __getattr__(self, name):
-        return lambda context={}, **kwargs: toolkit.get_action(name)(context, kwargs)
+        def wrapper(context=None, **kwargs):
+            context = dict(context) if context else {}
+            return toolkit.get_action(name)(context, kwargs)
+        return wrapper
 
 
 class DatetimeEncoder(json.JSONEncoder):
