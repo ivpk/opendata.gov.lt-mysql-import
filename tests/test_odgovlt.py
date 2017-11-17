@@ -61,7 +61,7 @@ def was_last_job_considered_error_free():
     job = mock.MagicMock()
     job.source = last_job.source
     job.id = ''
-    return bool(CKANHarvester._last_error_free_job(job))
+    return bool(CKANHarvester.last_error_free_job(job))
 
 
 @pytest.fixture
