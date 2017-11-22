@@ -8,7 +8,6 @@ import json
 import logging
 import re
 import string
-import ast
 
 import sqlalchemy as sa
 import unidecode
@@ -304,7 +303,7 @@ class OdgovltHarvester(HarvesterBase):
             organization = self.sync_organization(row.istaiga_id, conn)
             database_data['VARDAS'] = user['fullname']
             database_data['ORGANIZACIJA'] = organization['name']
-            database_data['KATEGORIJA_RINKMENA'] = str(kategorija_rinkmena_data)
+            database_data['KATEGORIJA_RINKMENA'] = json.dumps(kategorija_rinkmena_data)
             self.api.organization_member_create(
                 {'user': self.importbot['name']},
                 id=organization['name'],
@@ -336,7 +335,7 @@ class OdgovltHarvester(HarvesterBase):
             'owner_org': data_to_import['ORGANIZACIJA'],
         }
         self._create_or_update_package(package_dict, harvest_object)
-        kategorija_rinkmena = ast.literal_eval(data_to_import['KATEGORIJA_RINKMENA'])
+        kategorija_rinkmena = json.loads(data_to_import['KATEGORIJA_RINKMENA'])
         context = {'user': self.importbot['name']}
         data_dict = {}
         data_dict['id'] = package_dict['id']

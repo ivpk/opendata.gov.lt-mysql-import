@@ -222,12 +222,12 @@ def test_OdgovltHarvester(app, db, mocker):
 
     db.engine.execute(db.meta.tables['t_kategorija_rinkmena'].insert(), {
         'KATEGORIJA_ID': 1,
-        'RINKMENA_ID': '1'
+        'RINKMENA_ID': 1
     })
 
     db.engine.execute(db.meta.tables['t_kategorija_rinkmena'].insert(), {
         'KATEGORIJA_ID': 3,
-        'RINKMENA_ID': '2'
+        'RINKMENA_ID': 2
     })
 
     ckanapi = CkanAPI()
@@ -302,14 +302,14 @@ def test_OdgovltHarvester(app, db, mocker):
     organization3 = harvester.sync_organization(3, conn)
     database_data_list[0]['ORGANIZACIJA'] = organization1['name']
     database_data_list[1]['ORGANIZACIJA'] = organization2['name']
-    database_data_list[0]['KATEGORIJA_RINKMENA'] = str([{
-            'ID': '1',
-            'KATEGORIJA_ID': '1',
-            'RINKMENA_ID': '1'}])
-    database_data_list[1]['KATEGORIJA_RINKMENA'] = str([{
-            'ID': '2',
-            'KATEGORIJA_ID': '1',
-            'RINKMENA_ID': '2'}])
+    database_data_list[0]['KATEGORIJA_RINKMENA'] = json.dumps([{
+            'ID': 1,
+            'KATEGORIJA_ID': 1,
+            'RINKMENA_ID': 1}])
+    database_data_list[1]['KATEGORIJA_RINKMENA'] = json.dumps([{
+            'ID': 2,
+            'KATEGORIJA_ID': 1,
+            'RINKMENA_ID': 2}])
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
