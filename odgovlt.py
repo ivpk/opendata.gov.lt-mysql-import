@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import string
+import ast
 
 import sqlalchemy as sa
 import unidecode
@@ -82,6 +83,8 @@ def get_package_tags(r_zodziai):
 
             if len(name) > 100:
                 log.warning("skip very long tag: %r", tag)
+            elif len(name) < 2:
+                log.warning("skip too short tag: %r", tag)
             else:
                 name_list.append(name)
     return name_list
@@ -214,6 +217,35 @@ class OdgovltHarvester(HarvesterBase):
         organization_data['id'] = ckan_organization['id']
         return organization_data
 
+    def sync_group(self, grupe_id, conn):
+        self.api = CkanAPI()
+        self.importbot = self.sync_importbot_user()
+
+        group = conn.execute(sa.select([self.t.kategorija]).where(self.t.kategorija.c.ID == grupe_id)).fetchone()
+
+        group_data = {
+            'id': group.ID,
+            'name': slugify(group.PAVADINIMAS),
+        }
+
+        extra_data = {
+            'ID': str(group.ID),
+            'KATEGORIJA_ID': str(group.KATEGORIJA_ID),
+            'LYGIS': group.LYGIS
+        }
+
+        try:
+            ckan_group = \
+                self.api.group_show(id=group_data['name'])
+        except NotFound:
+            ckan_group = None
+
+        if ckan_group is None:
+            context = {'user': self.importbot['name']}
+            ckan_group = \
+                self.api.group_create(context, **group_data)
+        return extra_data
+
     def info(self):
         return {
             'name': 'opendata-gov-lt',
@@ -223,13 +255,15 @@ class OdgovltHarvester(HarvesterBase):
         }
 
     def gather_stage(self, harvest_job):
-        log.debug('In opendatagov gather_stage')
+        log.debug('In OdgovltHarvester gather_stage')
         con, meta = self._connect_to_database(harvest_job.source.url)
 
         class Tables(object):
             user = meta.tables['t_user']
             istaiga = meta.tables['t_istaiga']
             rinkmena = meta.tables['t_rinkmena']
+            kategorija = meta.tables['t_kategorija']
+            kategorija_rinkmena = meta.tables['t_kategorija_rinkmena']
 
         self.t = Tables
 
@@ -240,6 +274,29 @@ class OdgovltHarvester(HarvesterBase):
             sa.select([self.t.rinkmena]).
             where(self.t.rinkmena.c.STATUSAS == 'U')
         )
+        query2 = (sa.select([self.t.kategorija]))
+        group_data = []
+        for row in con.execute(query2):
+            group = self.sync_group(row.ID, conn)
+            group_data.append(group)
+        context = {'user': self.importbot['name']}
+        for row in group_data:
+            data_dict = {}
+            id = row['ID']
+            groups = []
+            for row2 in group_data:
+                if id == row2['KATEGORIJA_ID']:
+                    groups.append({'name': row2['ID']})
+            data_dict['id'] = id
+            data_dict['groups'] = groups
+            self.api.group_patch(context, **data_dict)
+        query3 = (sa.select([self.t.kategorija_rinkmena]))
+        kategorija_rinkmena_data = []
+        for row in con.execute(query3):
+            kategorija_rinkmena_data.append({
+                    'ID': row.ID,
+                    'KATEGORIJA_ID': row.KATEGORIJA_ID,
+                    'RINKMENA_ID': row.RINKMENA_ID})
         for row in con.execute(query):
             database_data = dict(row)
             id = database_data['ID']
@@ -247,6 +304,7 @@ class OdgovltHarvester(HarvesterBase):
             organization = self.sync_organization(row.istaiga_id, conn)
             database_data['VARDAS'] = user['fullname']
             database_data['ORGANIZACIJA'] = organization['name']
+            database_data['KATEGORIJA_RINKMENA'] = str(kategorija_rinkmena_data)
             self.api.organization_member_create(
                 {'user': self.importbot['name']},
                 id=organization['name'],
@@ -259,9 +317,11 @@ class OdgovltHarvester(HarvesterBase):
         return ids
 
     def fetch_stage(self, harvest_object):
+        log.debug('In OdgovltHarvester fetch_stage')
         return True
 
     def import_stage(self, harvest_object):
+        log.debug('In OdgovltHarvester import_stage')
         data_to_import = json.loads(harvest_object.content)
         pavadinimas = data_to_import['PAVADINIMAS']
         package_dict = {
@@ -275,4 +335,15 @@ class OdgovltHarvester(HarvesterBase):
             'maintainer_email': data_to_import['K_EMAIL'],
             'owner_org': data_to_import['ORGANIZACIJA'],
         }
-        return self._create_or_update_package(package_dict, harvest_object)
+        self._create_or_update_package(package_dict, harvest_object)
+        kategorija_rinkmena = ast.literal_eval(data_to_import['KATEGORIJA_RINKMENA'])
+        context = {'user': self.importbot['name']}
+        data_dict = {}
+        data_dict['id'] = package_dict['id']
+        groups = []
+        for data in kategorija_rinkmena:
+            if str(data['RINKMENA_ID']) == package_dict['id']:
+                groups.append({'id': data['KATEGORIJA_ID']})
+        data_dict['groups'] = groups
+        self.api.package_patch(context, **data_dict)
+        return True
