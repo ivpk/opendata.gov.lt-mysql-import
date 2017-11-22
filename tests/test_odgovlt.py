@@ -250,7 +250,7 @@ def test_OdgovltHarvester(app, db, mocker):
         group5 = ckanapi.group_show(id='5')
         group6 = ckanapi.group_show(id='6')
         group7 = ckanapi.group_show(id='7')
-    except:
+    except Exception:
         pass
     assert group1
     assert group2
