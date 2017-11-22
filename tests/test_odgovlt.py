@@ -355,16 +355,16 @@ def test_OdgovltHarvester(app, db, mocker):
                         u'display_name': u'testas1', u'description': u'',
                         u'image_display_url': u'', u'title': u'',
                         u'id': u'1', u'name': u'testas1'}]
-    assert package2['groups'] == [{
-                        u'display_name': u'testas3', u'description': u'',
-                        u'image_display_url': u'', u'title': u'',
-                        u'id': u'3', u'name': u'testas3'}]
     assert package2['title'] == 'Testinė rinkmena nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
     assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
+    assert package2['groups'] == [{
+                        u'display_name': u'testas3', u'description': u'',
+                        u'image_display_url': u'', u'title': u'',
+                        u'id': u'3', u'name': u'testas3'}]
     assert user3['fullname'] == 'Unknown User'
     assert organization3['title'] == 'Unknown organization'
     fixcase_test = fixcase('Testas9')
