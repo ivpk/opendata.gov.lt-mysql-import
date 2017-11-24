@@ -2,7 +2,7 @@ language: python
 python:
   - "2.7"
 install:
-  - pip install flake8 docutils
+  - pip install flake8 docutils pygments
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
   - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
