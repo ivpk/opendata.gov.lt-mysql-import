@@ -2,7 +2,6 @@
 
 from __future__ import unicode_literals
 
-import collections
 import contextlib
 import gettext
 import json
@@ -35,6 +34,7 @@ from odgovlt import OdgovltHarvester
 from odgovlt import fixcase
 from odgovlt import get_package_tags
 from odgovlt import slugify
+from odgovlt import IvpkIrsSync
 
 
 class CKANTestApp(webtest.TestApp):
@@ -67,14 +67,11 @@ def was_last_job_considered_error_free():
 @pytest.fixture
 def db():
     engine = sa.create_engine('sqlite://')
-    meta = sa.MetaData()
 
     with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
         engine.raw_connection().executescript(f.read())
 
-    meta.reflect(bind=engine)
-
-    return collections.namedtuple('DB', ('engine', 'meta'))(engine, meta)
+    return engine
 
 
 @pytest.fixture
@@ -102,6 +99,7 @@ def app(postgres, mocker, caplog):
         'ckan.site_url': 'http://localhost',
         'ckan.plugins': 'harvest odgovlt_harvester',
         'sqlalchemy.url': postgres,
+        'ckanext.harvest.user_name': 'harvest',
         # 'solr_url': 'http://127.0.0.1:8983/solr/ckan',
     }
     app_config = {
@@ -120,9 +118,10 @@ def app(postgres, mocker, caplog):
 
 
 def test_OdgovltHarvester(app, db, mocker):
-    mocker.patch('odgovlt.OdgovltHarvester._connect_to_database', return_value=db)
+    sync = IvpkIrsSync(db)
+    mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
 
-    db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
+    db.execute(sync.t.rinkmena.insert(), {
         'PAVADINIMAS': 'Testinė rinkmena nr. 1',
         'SANTRAUKA': 'Testas nr. 1',
         'TINKLAPIS': 'http://www.testas1.lt',
@@ -137,7 +136,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'istaiga_id': 1,
     })
 
-    db.engine.execute(db.meta.tables['t_rinkmena'].insert(), {
+    db.execute(sync.t.rinkmena.insert(), {
         'PAVADINIMAS': 'Testinė rinkmena nr. 2',
         'SANTRAUKA': 'Testas nr. 2',
         'TINKLAPIS': 'http://www.testas2.lt',
@@ -148,7 +147,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'istaiga_id': 2,
     })
 
-    db.engine.execute(db.meta.tables['t_user'].insert(), {
+    db.execute(sync.t.user.insert(), {
         'LOGIN': 'User1',
         'PASS': 'secret123',
         'EMAIL': 'testas1@testas1.com',
@@ -157,7 +156,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'LAST_NAME': 'Jonaitis',
     })
 
-    db.engine.execute(db.meta.tables['t_user'].insert(), {
+    db.execute(sync.t.user.insert(), {
         'LOGIN': 'User2',
         'PASS': 'secret123',
         'EMAIL': 'testas2@testas2.com',
@@ -166,150 +165,129 @@ def test_OdgovltHarvester(app, db, mocker):
         'LAST_NAME': 'Tomauskas',
     })
 
-    db.engine.execute(db.meta.tables['t_istaiga'].insert(), {
+    db.execute(sync.t.istaiga.insert(), {
         'PAVADINIMAS': 'Testinė organizacija nr. 1',
         'KODAS': 888,
         'ADRESAS': 'Testinė g. 9'
     })
 
-    db.engine.execute(db.meta.tables['t_istaiga'].insert(), {
+    db.execute(sync.t.istaiga.insert(), {
         'PAVADINIMAS': 'Testinė organizacija nr. 2',
         'KODAS': 777,
         'ADRESAS': 'Testinė g. 91'
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas1',
         'KATEGORIJA_ID': 0,
         'LYGIS': 1
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas2',
         'KATEGORIJA_ID': 0,
         'LYGIS': 1
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas3',
         'KATEGORIJA_ID': 1,
         'LYGIS': 2
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas4',
         'KATEGORIJA_ID': 2,
         'LYGIS': 2
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas5',
         'KATEGORIJA_ID': 3,
         'LYGIS': 3
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas6',
         'KATEGORIJA_ID': 4,
         'LYGIS': 3
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija'].insert(), {
+    db.execute(sync.t.kategorija.insert(), {
         'PAVADINIMAS': 'testas7',
         'KATEGORIJA_ID': 4,
         'LYGIS': 3
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija_rinkmena'].insert(), {
+    db.execute(sync.t.kategorija_rinkmena.insert(), {
         'KATEGORIJA_ID': 1,
         'RINKMENA_ID': 1
     })
 
-    db.engine.execute(db.meta.tables['t_kategorija_rinkmena'].insert(), {
+    db.execute(sync.t.kategorija_rinkmena.insert(), {
         'KATEGORIJA_ID': 3,
         'RINKMENA_ID': 2
     })
 
-    ckanapi = CkanAPI()
+    ckanapi = CkanAPI({'user': 'harvest'})
+
     source = HarvestSourceObj(url='sqlite://', source_type='opendata-gov-lt')
     job = HarvestJobObj(source=source)
     harvester = OdgovltHarvester()
+
     obj_ids = harvester.gather_stage(job)
-    group1 = None
-    group2 = None
-    group3 = None
-    group4 = None
-    group5 = None
-    group6 = None
-    group7 = None
-    try:
-        group1 = ckanapi.group_show(id='1')
-        group2 = ckanapi.group_show(id='2')
-        group3 = ckanapi.group_show(id='3')
-        group4 = ckanapi.group_show(id='4')
-        group5 = ckanapi.group_show(id='5')
-        group6 = ckanapi.group_show(id='6')
-        group7 = ckanapi.group_show(id='7')
-    except Exception:
-        pass
-    assert group1
-    assert group2
-    assert group3
-    assert group4
-    assert group5
-    assert group6
-    assert group7
-    assert group1['name'] == 'testas1'
-    assert group2['name'] == 'testas2'
-    assert group3['name'] == 'testas3'
-    assert group4['name'] == 'testas4'
-    assert group5['name'] == 'testas5'
-    assert group6['name'] == 'testas6'
-    assert group7['name'] == 'testas7'
-    assert group1['groups'] == [{'capacity': u'public', 'name': u'testas3'}]
-    assert group2['groups'] == [{'capacity': u'public', 'name': u'testas4'}]
-    assert group3['groups'] == [{'capacity': u'public', 'name': u'testas5'}]
-    assert group4['groups'] == [{'capacity': u'public', 'name': u'testas6'},
-                                {'capacity': u'public', 'name': u'testas7'}]
-    assert group5['groups'] == []
-    assert group6['groups'] == []
-    assert group7['groups'] == []
     assert job.gather_errors == []
+
+    assert ckanapi.group_list() == [
+        'testas1-1',
+        'testas2-2',
+        'testas3-3',
+        'testas4-4',
+        'testas5-5',
+        'testas6-6',
+        'testas7-7',
+    ]
+
+    def subgroups(name):
+        return [g['name'] for g in ckanapi.group_show(id=name)['groups']]
+
+    assert subgroups('testas1-1') == ['testas3-3']
+    assert subgroups('testas2-2') == ['testas4-4']
+    assert subgroups('testas3-3') == ['testas5-5']
+    assert subgroups('testas4-4') == ['testas6-6', 'testas7-7']
+    assert subgroups('testas5-5') == []
+    assert subgroups('testas6-6') == []
+    assert subgroups('testas7-7') == []
+
     assert [json.loads(ckanext.harvest.model.HarvestObject.get(x).content)['PAVADINIMAS'] for x in obj_ids] == [
         'Testinė rinkmena nr. 1',
         'Testinė rinkmena nr. 2',
     ]
-    title = (
-        'Radiacinės saugos centro išduotų galiojančių '
-        'licencijų verstis veikla su jonizuojančiosios spinduliuotės '
-        'šaltiniais duomenys'
-    )
-    slug1 = slugify(title, length=42)
-    assert len(slug1) <= 42
-    assert slug1 == 'radiacines-saugos--duomenys-saltiniais'
-    slug2 = slugify()
-    assert slug2 == ''
-    clause = db.meta.tables['t_rinkmena'].select()
-    database_data_list = [dict(row) for row in db.engine.execute(clause)]
-    conn = db.engine.connect()
-    user1 = harvester.sync_user(1, conn)
-    user2 = harvester.sync_user(2, conn)
-    user3 = harvester.sync_user(3, conn)
+    database_data_list = [dict(row) for row in db.execute(sync.t.rinkmena.select())]
+    user1 = sync.sync_user(1)
+    user2 = sync.sync_user(2)
+    user3 = sync.sync_user(3)
     database_data_list[0]['VARDAS'] = user1['fullname']
     database_data_list[1]['VARDAS'] = user2['fullname']
-    organization1 = harvester.sync_organization(1, conn)
-    organization2 = harvester.sync_organization(2, conn)
-    organization3 = harvester.sync_organization(3, conn)
+    organization1 = sync.sync_organization(1)
+    organization2 = sync.sync_organization(2)
+    organization3 = sync.sync_organization(3)
     database_data_list[0]['ORGANIZACIJA'] = organization1['name']
     database_data_list[1]['ORGANIZACIJA'] = organization2['name']
-    database_data_list[0]['KATEGORIJA_RINKMENA'] = json.dumps([{
+    database_data_list[0]['KATEGORIJA_RINKMENA'] = json.dumps([
+        {
             'ID': 1,
             'KATEGORIJA_ID': 1,
-            'RINKMENA_ID': 1}])
-    database_data_list[1]['KATEGORIJA_RINKMENA'] = json.dumps([{
+            'RINKMENA_ID': 1,
+        }
+    ])
+    database_data_list[1]['KATEGORIJA_RINKMENA'] = json.dumps([
+        {
             'ID': 2,
             'KATEGORIJA_ID': 1,
-            'RINKMENA_ID': 2}])
+            'RINKMENA_ID': 2,
+        }
+    ])
     obj1 = HarvestObjectObj(
         guid=database_data_list[0]['ID'],
         job=job,
@@ -331,6 +309,8 @@ def test_OdgovltHarvester(app, db, mocker):
     assert obj1.package_id
     assert obj2.package_id
     reset_db()
+    sync = IvpkIrsSync(db)
+    mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
     results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
@@ -351,20 +331,32 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
-    assert package1['groups'] == [{
-                        u'display_name': u'testas1', u'description': u'',
-                        u'image_display_url': u'', u'title': u'',
-                        u'id': u'1', u'name': u'testas1'}]
+    assert package1['groups'] == [
+        {
+            'display_name': 'testas1',
+            'description': '',
+            'image_display_url': '',
+            'title': 'testas1',
+            'id': package1['groups'][0]['id'],
+            'name': 'testas1-1',
+        }
+    ]
     assert package2['title'] == 'Testinė rinkmena nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
     assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
-    assert package2['groups'] == [{
-                        u'display_name': u'testas3', u'description': u'',
-                        u'image_display_url': u'', u'title': u'',
-                        u'id': u'3', u'name': u'testas3'}]
+    assert package2['groups'] == [
+        {
+            'display_name': 'testas3',
+            'description': '',
+            'image_display_url': '',
+            'title': 'testas3',
+            'id': package2['groups'][0]['id'],
+            'name': 'testas3-3',
+        }
+    ]
     assert user3['fullname'] == 'Unknown User'
     assert organization3['title'] == 'Unknown organization'
     fixcase_test = fixcase('Testas9')
@@ -394,3 +386,14 @@ def test_OdgovltHarvester(app, db, mocker):
         'eismo intensyvumas',
         'keliai',
     ]
+
+
+def test_slugify():
+    title = (
+        'Radiacinės saugos centro išduotų galiojančių '
+        'licencijų verstis veikla su jonizuojančiosios spinduliuotės '
+        'šaltiniais duomenys'
+    )
+    assert len(slugify(title, length=42)) < 42
+    assert slugify(title, length=42) == 'radiacines-saugos--duomenys-saltiniais'
+    assert slugify() == ''

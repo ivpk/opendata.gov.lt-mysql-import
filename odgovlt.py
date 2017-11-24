@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+import collections
 import datetime
 import itertools
 import json
@@ -12,16 +13,20 @@ import string
 import sqlalchemy as sa
 import unidecode
 
+from ckan import model
 from ckan.logic import NotFound
 from ckan.plugins import toolkit
 from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
+from pylons import config
 
 log = logging.getLogger(__name__)
 
-SOURCE_ID_KEY = 'Išorinis ID'
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
+SOURCE_ID_KEY = 'Šaltinio ID'
+SOURCE_NAME = 'Šaltinis'
+SOURCE_IVPK_IRS = 'IVPK IRS'
 
 
 def fixcase(value):
@@ -94,11 +99,33 @@ class CkanAPI(object):
     See: http://docs.ckan.org/en/latest/api/index.html#action-api-reference
     """
 
+    def __init__(self, context=None):
+        self.context = context or {}
+
     def __getattr__(self, name):
         def wrapper(context=None, **kwargs):
-            context = dict(context) if context else {}
+            context = dict(context) if context else dict(self.context)
             return toolkit.get_action(name)(context, kwargs)
         return wrapper
+
+
+def was_changed(new, old, object_name, path=()):
+    if isinstance(new, dict):
+        for key in new:
+            if was_changed(new[key], old.get(key), object_name, path + (key,)):
+                return True
+    elif isinstance(new, list):
+        for i in range(len(new)):
+            if i >= len(old) or was_changed(new[i], old[i], object_name, path + (i,)):
+                return True
+    elif new != old:
+        log.debug('%s has been changed %r != %r', '.'.join(map(str, path)), new, old)
+        return True
+    return False
+
+
+def extras_to_dict(extras):
+    return {x['key']: x['value'] for x in extras}
 
 
 class DatetimeEncoder(json.JSONEncoder):
@@ -113,43 +140,57 @@ class DatetimeEncoder(json.JSONEncoder):
             return super(DatetimeEncoder, obj).default(obj)
 
 
-class OdgovltHarvester(HarvesterBase):
+class IvpkIrsSync(object):
 
-    def _connect_to_database(self, dburl):
-        con = sa.create_engine(dburl)
-        meta = sa.MetaData(bind=con, reflect=True)
-        return con, meta
+    def __init__(self, engine):
+        self.engine = engine
+        meta = sa.MetaData(bind=engine)
+        meta.reflect()
+        tables = {
+            'user': meta.tables['t_user'],
+            'istaiga': meta.tables['t_istaiga'],
+            'rinkmena': meta.tables['t_rinkmena'],
+            'kategorija': meta.tables['t_kategorija'],
+            'kategorija_rinkmena': meta.tables['t_kategorija_rinkmena'],
+        }
+        self.t = collections.namedtuple('Tables', tables.keys())(**tables)
 
-    def sync_importbot_user(self):
-        from ckan import model
+        self.api = CkanAPI({'user': self.sync_harvest_user()})
 
-        username = 'importbot'
-        user = model.User.by_name(username)
+    def sync_harvest_user(self):
+        name = config.get('ckanext.harvest.user_name') or 'harvest'
+        context = {'model': model, 'ignore_auth': True}
 
-        if not user:
-            # TODO: How to deal with passwords?
-            user = model.User(name=username, password='secret123')
+        try:
+            user = toolkit.get_action('user_show')(context, {'id': name})
+        except toolkit.ObjectNotFound:
+            log.info('create %r sysadmin user', name)
+            user = model.User(name=name, password='secret123')
             user.sysadmin = True
             model.Session.add(user)
-            model.repo.commit_and_remove()
+            model.Session.commit()
+        else:
+            if not user['sysadmin']:
+                log.info('add sysadmin priviledges to %r user', name)
+                user = model.User.get(user['id'])
+                user.sysadmin = True
+                user.save()
+                model.Session.add(user)
+                model.Session.commit()
 
-        return self.api.user_show(id=username)
+        return name
 
-    def sync_user(self, user_id, conn):
-        self.api = CkanAPI()
-        self.importbot = self.sync_importbot_user()
-        user = conn.execute(
-            sa.select([self.t.user]).where(self.t.user.c.ID == user_id)
-        ).fetchone()
-        if user:
+    def sync_user(self, user_id):
+        ivpk_user = self.engine.execute(sa.select([self.t.user]).  where(self.t.user.c.ID == user_id)).fetchone()
+        if ivpk_user:
             user_data = {
-                'name': slugify(user.LOGIN),
+                'name': slugify(ivpk_user.LOGIN),
                 # TODO: Passwrods are encoded with md5 hash, I need to look if
                 #       CKAN supports md5 hashed passwords. If not,
                 #       then users will have to change their passwords.
-                'email': user.EMAIL,
-                'password': user.PASS,
-                'fullname': ' '.join([user.FIRST_NAME, user.LAST_NAME]),
+                'email': ivpk_user.EMAIL,
+                'password': ivpk_user.PASS,
+                'fullname': ' '.join([ivpk_user.FIRST_NAME, ivpk_user.LAST_NAME]),
             }
         else:
             user_data = {
@@ -167,15 +208,17 @@ class OdgovltHarvester(HarvesterBase):
         ), None)
 
         if ckan_user is None:
-            context = {'user': self.importbot['name']}
-            ckan_user = self.api.user_create(context, **user_data)
+            ckan_user = self.api.user_create(**user_data)
 
         user_data['id'] = ckan_user['id']
 
         return user_data
 
-    def sync_organization(self, istaiga_id, conn):
-        organization = conn.execute(sa.select([self.t.istaiga]).where(self.t.istaiga.c.ID == istaiga_id)).fetchone()
+    def sync_organization(self, istaiga_id):
+        organization = self.engine.execute(
+            sa.select([self.t.istaiga]).
+            where(self.t.istaiga.c.ID == istaiga_id)
+        ).fetchone()
 
         if organization:
             organization_data = {
@@ -204,113 +247,121 @@ class OdgovltHarvester(HarvesterBase):
             }
 
         try:
-            ckan_organization = \
-                self.api.organization_show(id=organization_data['name'])
+            ckan_organization = self.api.organization_show(id=organization_data['name'])
         except NotFound:
             ckan_organization = None
 
         if ckan_organization is None:
-            context = {'user': self.importbot['name']}
-            ckan_organization = self.api.organization_create(context, **organization_data)
+            ckan_organization = self.api.organization_create(**organization_data)
 
         organization_data['id'] = ckan_organization['id']
         return organization_data
 
-    def sync_group(self, grupe_id, conn):
-        self.api = CkanAPI()
-        self.importbot = self.sync_importbot_user()
+    def sync_group_tree(self, ckan_group_names, ivpk_groups, ivpk_parent_group_id=0):
+        for group_name, ivpk_group in ivpk_groups[ivpk_parent_group_id]:
+            group_data = {
+                'name': group_name,
+                'title': ivpk_group.PAVADINIMAS,
+                'extras': [
+                    {'key': SOURCE_NAME, 'value': SOURCE_IVPK_IRS},
+                    {'key': SOURCE_ID_KEY, 'value': ivpk_group.ID},
+                ],
+                'groups': [
+                    {'name': ckan_group['name']}
+                    for ckan_group in self.sync_group_tree(ckan_group_names, ivpk_groups, ivpk_group.ID)
+                ],
+                'state': 'active',
+            }
 
-        group = conn.execute(sa.select([self.t.kategorija]).where(self.t.kategorija.c.ID == grupe_id)).fetchone()
+            if group_name in ckan_group_names:
+                ckan_group = self.api.group_show(id=group_name)
+                if was_changed(group_data, ckan_group, 'group'):
+                    group_data['id'] = group_name
+                    log.info('update group: %s', group_name)
+                    ckan_group = self.api.group_patch(**group_data)
+                else:
+                    log.debug('group is up to date: %s', group_name)
+                yield ckan_group
+            else:
+                log.info('create group: %s', group_name)
+                yield self.api.group_create(**group_data)
 
-        group_data = {
-            'id': group.ID,
-            'name': slugify(group.PAVADINIMAS),
-        }
+    def _get_group_name(self, ivpk_group):
+        return slugify(ivpk_group.PAVADINIMAS + ' ' + str(ivpk_group.ID))
 
-        extra_data = {
-            'ID': str(group.ID),
-            'KATEGORIJA_ID': str(group.KATEGORIJA_ID),
-            'LYGIS': group.LYGIS
-        }
+    def sync_groups(self):
+        # We can't use api.group_list, becuase we also need list of deleted groups.
+        ckan_group_names = set(
+            group_name
+            for group_name, in (
+                model.Session.query(model.Group.name).
+                filter(model.Group.is_organization == False)  # noqa
+            )
+        )
+        ivpk_group_names = set()
+        ivpk_groups = collections.defaultdict(list)
 
-        try:
-            ckan_group = \
-                self.api.group_show(id=group_data['name'])
-        except NotFound:
-            ckan_group = None
+        for ivpk_group in self.engine.execute(sa.select([self.t.kategorija])):
+            group_name = self._get_group_name(ivpk_group)
+            ivpk_groups[ivpk_group.KATEGORIJA_ID].append((group_name, ivpk_group))
+            ivpk_group_names.add(group_name)
 
-        if ckan_group is None:
-            context = {'user': self.importbot['name']}
-            ckan_group = \
-                self.api.group_create(context, **group_data)
-        return extra_data
+        for _ in self.sync_group_tree(ckan_group_names, ivpk_groups):
+            pass
+
+        stale_ckan_groups = ckan_group_names - ivpk_group_names
+        for group_name in stale_ckan_groups:
+            ckan_group = self.api.group_show(id=group_name)
+            ckan_group_extras = extras_to_dict(ckan_group['extras'])
+            if ckan_group_extras.get(SOURCE_NAME) == SOURCE_IVPK_IRS:
+                log.info('delete stale group: %s', ckan_group['name'])
+                self.api.group_delete(id=ckan_group['id'])
+
+    def get_package_groups(self, dataset_id):
+        dataset_ivpk_group_ids = set([
+            row.KATEGORIJA_ID
+            for row in self.engine.execute(
+                sa.select([self.t.kategorija_rinkmena]).
+                where(self.t.kategorija_rinkmena.c.RINKMENA_ID == dataset_id)
+            )
+        ])
+
+        for ivpk_group_id in dataset_ivpk_group_ids:
+            ivpk_group = self.engine.execute(
+                sa.select([self.t.kategorija]).
+                where(self.t.kategorija.c.ID == ivpk_group_id)
+            ).first()
+            yield self._get_group_name(ivpk_group)
+
+    def get_ivpk_datasets(self):
+        query = (
+            sa.select([self.t.rinkmena]).
+            where(self.t.rinkmena.c.STATUSAS == 'U')
+        )
+        for ivpk_dataset in self.engine.execute(query):
+            yield ivpk_dataset
+
+
+class OdgovltHarvester(HarvesterBase):
 
     def info(self):
         return {
             'name': 'opendata-gov-lt',
             'title': 'opendata.gov.lt',
             'description': 'Harvest opendata.gov.lt',
-            'form_config_interface': 'Text'
+            'form_config_interface': 'Text',
         }
 
-    def gather_stage(self, harvest_job):
+    def gather_stage(self, harvest_object):
         log.debug('In OdgovltHarvester gather_stage')
-        con, meta = self._connect_to_database(harvest_job.source.url)
 
-        class Tables(object):
-            user = meta.tables['t_user']
-            istaiga = meta.tables['t_istaiga']
-            rinkmena = meta.tables['t_rinkmena']
-            kategorija = meta.tables['t_kategorija']
-            kategorija_rinkmena = meta.tables['t_kategorija_rinkmena']
-
-        self.t = Tables
+        sync = IvpkIrsSync(sa.create_engine(harvest_object.source.url))
+        sync.sync_groups()
 
         ids = []
-        database_data = {}
-        conn = con.connect()
-        query = (
-            sa.select([self.t.rinkmena]).
-            where(self.t.rinkmena.c.STATUSAS == 'U')
-        )
-        query2 = (sa.select([self.t.kategorija]))
-        group_data = []
-        for row in con.execute(query2):
-            group = self.sync_group(row.ID, conn)
-            group_data.append(group)
-        context = {'user': self.importbot['name']}
-        for row in group_data:
-            data_dict = {}
-            id = row['ID']
-            groups = []
-            for row2 in group_data:
-                if id == row2['KATEGORIJA_ID']:
-                    groups.append({'name': row2['ID']})
-            data_dict['id'] = id
-            data_dict['groups'] = groups
-            self.api.group_patch(context, **data_dict)
-        query3 = (sa.select([self.t.kategorija_rinkmena]))
-        kategorija_rinkmena_data = []
-        for row in con.execute(query3):
-            kategorija_rinkmena_data.append({
-                    'ID': row.ID,
-                    'KATEGORIJA_ID': row.KATEGORIJA_ID,
-                    'RINKMENA_ID': row.RINKMENA_ID})
-        for row in con.execute(query):
-            database_data = dict(row)
-            id = database_data['ID']
-            user = self.sync_user(row.USER_ID, conn)
-            organization = self.sync_organization(row.istaiga_id, conn)
-            database_data['VARDAS'] = user['fullname']
-            database_data['ORGANIZACIJA'] = organization['name']
-            database_data['KATEGORIJA_RINKMENA'] = json.dumps(kategorija_rinkmena_data)
-            self.api.organization_member_create(
-                {'user': self.importbot['name']},
-                id=organization['name'],
-                username=user['name'],
-                role='editor',
-            )
-            obj = HarvestObject(guid=id, job=harvest_job, content=json.dumps(database_data, cls=DatetimeEncoder))
+        for ivpk_dataset in sync.get_ivpk_datasets():
+            content = json.dumps(dict(ivpk_dataset), cls=DatetimeEncoder)
+            obj = HarvestObject(guid=ivpk_dataset.ID, job=harvest_object, content=content)
             obj.save()
             ids.append(obj.id)
         return ids
@@ -321,28 +372,36 @@ class OdgovltHarvester(HarvesterBase):
 
     def import_stage(self, harvest_object):
         log.debug('In OdgovltHarvester import_stage')
-        data_to_import = json.loads(harvest_object.content)
-        pavadinimas = data_to_import['PAVADINIMAS']
+
+        sync = IvpkIrsSync(sa.create_engine(harvest_object.source.url))
+
+        ivpk_dataset = json.loads(harvest_object.content)
+        user = sync.sync_user(ivpk_dataset['USER_ID'])
+        organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
+        sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
+
         package_dict = {
             'id': harvest_object.guid,
-            'title': pavadinimas,
-            'notes': data_to_import['SANTRAUKA'],
-            'url': data_to_import['TINKLAPIS'],
-            'name': slugify(pavadinimas, length=42),
-            'tags': get_package_tags(data_to_import['R_ZODZIAI']),
-            'maintainer': data_to_import['VARDAS'],
-            'maintainer_email': data_to_import['K_EMAIL'],
-            'owner_org': data_to_import['ORGANIZACIJA'],
+            'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
+            'title': ivpk_dataset['PAVADINIMAS'],
+            'notes': ivpk_dataset['SANTRAUKA'],
+            'url': ivpk_dataset['TINKLAPIS'],
+            'maintainer': user['fullname'],
+            'maintainer_email': ivpk_dataset['K_EMAIL'],
+            'owner_org': organization['name'],
+            'state': 'active',
+            'tags': [
+                {'name': tag}
+                for tag in get_package_tags(ivpk_dataset['R_ZODZIAI'])
+            ],
+            'groups': [
+                {'name': ckan_group_name}
+                for ckan_group_name in sync.get_package_groups(ivpk_dataset['ID'])
+            ],
+            'extras': [
+                {'key': SOURCE_NAME, 'value': SOURCE_IVPK_IRS},
+                {'key': SOURCE_ID_KEY, 'value': ivpk_dataset['ID']},
+                {'key': CODE_KEY, 'value': ivpk_dataset['KODAS']},
+            ],
         }
-        self._create_or_update_package(package_dict, harvest_object)
-        kategorija_rinkmena = json.loads(data_to_import['KATEGORIJA_RINKMENA'])
-        context = {'user': self.importbot['name']}
-        data_dict = {}
-        data_dict['id'] = package_dict['id']
-        groups = []
-        for data in kategorija_rinkmena:
-            if str(data['RINKMENA_ID']) == package_dict['id']:
-                groups.append({'id': data['KATEGORIJA_ID']})
-        data_dict['groups'] = groups
-        self.api.package_patch(context, **data_dict)
-        return True
+        return self._create_or_update_package(package_dict, harvest_object, package_dict_form='package_show')
