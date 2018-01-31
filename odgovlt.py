@@ -106,15 +106,15 @@ def get_web(base_url, time, path, headers):
     cache_dict = {}
     cache_list = []
     substring = [
-       'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx',
-       'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
+        'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx',
+        'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
     not_allowed_substring = [
-       'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
+        'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
     for current in path:
         full_url = urlparse.urljoin(base_url, current)
         url_dict = {
-                'website': base_url,
-                'url': full_url}
+            'website': base_url,
+            'url': full_url}
         if not cache.__contains__(url_dict):
             cache_dict['website'] = base_url
             cache_dict['url'] = full_url
@@ -177,14 +177,14 @@ def make_cache(url, time=20, headers={'User-Agent': 'Custom user agent'}):
         op = type.startswith('text/html')
         page.close()
     except (
-       requests.exceptions.InvalidSchema,
-       requests.exceptions.MissingSchema,
-       requests.exceptions.ConnectionError,
-       lxml.etree.ParserError,
-       requests.exceptions.ChunkedEncodingError,
-       requests.exceptions.ReadTimeout,
-       requests.exceptions.InvalidURL,
-       AttributeError) as e:
+            requests.exceptions.InvalidSchema,
+            requests.exceptions.MissingSchema,
+            requests.exceptions.ConnectionError,
+            lxml.etree.ParserError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ReadTimeout,
+            requests.exceptions.InvalidURL,
+            AttributeError) as e:
         log.error(e)
         return
     if not op:
@@ -488,9 +488,9 @@ class OdgovltHarvester(HarvesterBase):
         cache_list_to_import = []
         for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
             cache_list_to_import.append(
-                 {'url': cache_data['url'],
-                  'name': cache_data['name'],
-                  'format': cache_data['type']})
+                {'url': cache_data['url'],
+                 'name': cache_data['name'],
+                 'format': cache_data['type']})
         package_dict = {
             'id': harvest_object.guid,
             'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
