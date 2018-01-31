@@ -4,5 +4,7 @@ pytest-mock
 pytest-catchlog
 sqlalchemy
 psycopg2
+lxml
+rfc6266
 -e git+https://github.com/ckan/ckan.git#egg=ckan
 -e git+https://github.com/ckan/ckanext-harvest.git#egg=ckanext-harvest

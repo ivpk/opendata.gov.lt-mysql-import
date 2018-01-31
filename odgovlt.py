@@ -9,8 +9,6 @@ import json
 import logging
 import re
 import string
-import os
-import sys
 
 import sqlalchemy as sa
 import unidecode
@@ -37,6 +35,7 @@ ADDRESS_KEY = 'Adresas'
 SOURCE_ID_KEY = 'Šaltinio ID'
 SOURCE_NAME = 'Šaltinis'
 SOURCE_IVPK_IRS = 'IVPK IRS'
+
 
 def fixcase(value):
     if len(value) > 1 and value[:2].isalpha() and value[0].isupper() and value[1].islower():
@@ -107,8 +106,8 @@ def get_web(base_url, time, path, headers):
     cache_dict = {}
     cache_list = []
     substring = [
-       'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx', 
-	   'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
+       'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx',
+       'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
     not_allowed_substring = [
        'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
     for current in path:
@@ -140,21 +139,20 @@ def get_web(base_url, time, path, headers):
                 if not type:
                     type = 'Unknown extension'
             except (
-                    requests.exceptions.InvalidSchema, 
+                    requests.exceptions.InvalidSchema,
                     requests.exceptions.ChunkedEncodingError,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.ReadTimeout,
                     requests.exceptions.InvalidURL,
-					NameError, UnboundLocalError, AttributeError) as e:
+                    NameError, UnboundLocalError, AttributeError) as e:
                 log.error(e)
             try:
                 cache_dict['name'] = filename
                 cache_dict['type'] = type
                 if type == 'Unknown extension':
                     cache_dict['is_data'] = False
-                    cache_dict['cached_forever'] = False 
-                elif any(x in type for x in substring) and not \
-                   any(x in full_url for x in not_allowed_substring):
+                    cache_dict['cached_forever'] = False
+                elif any(x in type for x in substring) and not any(x in full_url for x in not_allowed_substring):
                     cache_dict['is_data'] = True
                     cache_dict['cached_forever'] = False
                 else:
@@ -173,7 +171,7 @@ def get_web(base_url, time, path, headers):
 def make_cache(url, time=20, headers={'User-Agent': 'Custom user agent'}):
     headers = {'User-Agent': 'Custom user agent'}
     try:
-        page = requests.get(url, timeout = time, headers = headers)
+        page = requests.get(url, timeout=time, headers=headers)
         tree = html.fromstring(page.content)
         type = page.headers.get('content-type')
         op = type.startswith('text/html')
