@@ -3,7 +3,7 @@ group: deprecated-2017Q4
 python:
   - "2.7"
 virtualenv:
-  - system_site_packages: true
+    system_site_packages: true
 install:
   - pip install flake8 docutils pygments
   - sudo apt-get install solr-jetty openjdk-6-jdk python-lxml
