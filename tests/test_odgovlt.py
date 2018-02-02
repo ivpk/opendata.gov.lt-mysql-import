@@ -386,7 +386,6 @@ def test_OdgovltHarvester(app, db, mocker):
         'eismo intensyvumas',
         'keliai',
     ]
-    
 
 
 def test_slugify():

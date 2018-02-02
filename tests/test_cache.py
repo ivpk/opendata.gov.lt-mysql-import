@@ -25,10 +25,10 @@ def test_cache():
     cache.update(cache_dict2)
     database_data = []
     for row in engine.execute(clause):
-        database_data.append(
-                   {'website': row.website, 'url': row.url, 'name': row.name,
-                    'type': row.type, 'cached_forever': row.cached_forever,
-                    'is_data': row.is_data})
+        database_data.append({
+            'website': row.website, 'url': row.url, 'name': row.name,
+            'type': row.type, 'cached_forever': row.cached_forever,
+            'is_data': row.is_data})
     assert database_data[0] == cache_dict
     assert database_data[1] == cache_dict2
     assert cache.__contains__({'website': 'test1', 'url': 'test2'})
