@@ -35,6 +35,7 @@ from odgovlt import fixcase
 from odgovlt import get_package_tags
 from odgovlt import slugify
 from odgovlt import IvpkIrsSync
+from odgovlt import get_web
 
 
 class CKANTestApp(webtest.TestApp):

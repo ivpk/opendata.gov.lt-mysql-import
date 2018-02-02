@@ -103,7 +103,7 @@ def get_package_tags(r_zodziai):
     return name_list
 
 
-def get_web(base_url, time, path, headers):
+def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
     cache_dict = {}
     cache_list = []
     substring = [
@@ -111,6 +111,26 @@ def get_web(base_url, time, path, headers):
         'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
     not_allowed_substring = [
         'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
+    try:
+        page = requests.get(base_url, timeout=time, headers=headers)
+        tree = html.fromstring(page.content)
+        type = page.headers.get('content-type')
+        op = type.startswith('text/html')
+        page.close()
+    except (
+            requests.exceptions.InvalidSchema,
+            requests.exceptions.MissingSchema,
+            requests.exceptions.ConnectionError,
+            lxml.etree.ParserError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ReadTimeout,
+            requests.exceptions.InvalidURL,
+            AttributeError) as e:
+        log.error(e)
+        return
+    if not op:
+        return
+    path = tree.xpath('//@href')
     for current in path:
         full_url = urlparse.urljoin(base_url, current)
         url_dict = {
@@ -169,29 +189,10 @@ def get_web(base_url, time, path, headers):
     return cache_list
 
 
-def make_cache(url, time=20, headers={'User-Agent': 'Custom user agent'}):
-    headers = {'User-Agent': 'Custom user agent'}
-    try:
-        page = requests.get(url, timeout=time, headers=headers)
-        tree = html.fromstring(page.content)
-        type = page.headers.get('content-type')
-        op = type.startswith('text/html')
-        page.close()
-    except (
-            requests.exceptions.InvalidSchema,
-            requests.exceptions.MissingSchema,
-            requests.exceptions.ConnectionError,
-            lxml.etree.ParserError,
-            requests.exceptions.ChunkedEncodingError,
-            requests.exceptions.ReadTimeout,
-            requests.exceptions.InvalidURL,
-            AttributeError) as e:
-        log.error(e)
+def make_cache(url):
+    new_caches = get_web(url)
+    if new_caches == None:
         return
-    if not op:
-        return
-    path = tree.xpath('//@href')
-    new_caches = get_web(url, time, path, headers)
     for cache_dict in new_caches:
         try:
             cache.update(cache_dict)
