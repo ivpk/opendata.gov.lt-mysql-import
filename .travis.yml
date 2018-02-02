@@ -1,13 +1,9 @@
 language: python
-group: deprecated-2017Q4
 python:
   - "2.7"
-virtualenv:
-    system_site_packages: true
 install:
   - pip install flake8 docutils pygments
   - sudo apt-get install solr-jetty openjdk-6-jdk
-  - sudo -E apt-get -yq --no-install-suggests --no-install-recommends --force-yes install python-lxml
 before_script:
   - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
   - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' /etc/default/jetty
