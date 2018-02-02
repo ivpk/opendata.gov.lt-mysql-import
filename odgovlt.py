@@ -19,7 +19,7 @@ from ckan.plugins import toolkit
 from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
 from pylons import config
-from lxml import html
+#from lxml import html
 from cache.cache import Cache
 from os.path import basename, splitext
 import requests
