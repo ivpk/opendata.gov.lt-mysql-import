@@ -367,7 +367,7 @@ def test_OdgovltHarvester(app, db, mocker):
         href1 = '<a href="%s" target="_blank"></a>' % file1
         href2 = '<a href="%s" target="_blank"></a>' % file2
         page = href1 + href2
-        m.get(url, text=page, headers={'content-type': 'text/html'})
+        m.register_uri('GET', url, text=page, headers={'content-type': 'text/html'})
         results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
