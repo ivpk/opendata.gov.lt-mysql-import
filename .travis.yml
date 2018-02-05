@@ -1,6 +1,6 @@
 language: python
 python:
-  - "2.7"
+  - "2.7.12"
 install:
   - pip install flake8 docutils pygments
   - sudo apt-get install solr-jetty openjdk-6-jdk
