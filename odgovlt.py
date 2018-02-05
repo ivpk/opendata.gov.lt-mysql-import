@@ -126,7 +126,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
             requests.exceptions.ReadTimeout,
             requests.exceptions.InvalidURL,
             AttributeError) as e:
-        log.error(e)
+        log.exception(e)
         return
     if not op:
         return
@@ -193,7 +193,6 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
 
 def make_cache(url):
     new_caches = get_web(url)
-    print 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ' + str(new_caches) + ' ' + url
     if new_caches is None:
         return
     for cache_dict in new_caches:
@@ -492,7 +491,6 @@ class OdgovltHarvester(HarvesterBase):
         make_cache(ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
         for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
-            print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + str(cache_data)
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
