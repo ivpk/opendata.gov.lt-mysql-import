@@ -144,7 +144,6 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                                            timeout=time,
                                            headers=headers,
                                            stream=True).headers.get('content-disposition')
-                print disposition
                 if disposition is None:
                     parse_url = requests.utils.urlparse(full_url)
                     filename = basename(parse_url.path)
@@ -168,6 +167,9 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                     requests.exceptions.InvalidURL,
                     NameError, UnboundLocalError, AttributeError) as e:
                 log.error(e)
+                print 'raaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                filename = 'Unknown name'
+                type = 'Unknown type'
             try:
                 cache_dict['name'] = filename
                 cache_dict['type'] = type
