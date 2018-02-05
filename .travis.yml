@@ -13,5 +13,6 @@ before_script:
 script:
   - rst2html.py --strict README.rst /dev/null
   - flake8 --max-line-length=120 odgovlt.py tests
-  - make test
+  - make
+  - py.test -s tests/
   
