@@ -159,6 +159,10 @@ def test_get_web():
                 'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]'''
         assert response[0] == {'website': url, 'is_data': True, 'name': 'file1.pdf',
                 'url': url + file1, 'cached_forever': False, 'type': 'pdf'}
+        assert response[1] == {'website': url, 'is_data': True, 'name': 'file2.doc',
+                'url': url + file2, 'cached_forever': False, 'type': 'doc'}
+        assert response[2] == {'website': url, 'is_data': False, 'name': 'file3.aspx',
+                'url': url + file3, 'cached_forever': True, 'type': 'aspx'}
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         m.get(url, text='test')
