@@ -125,7 +125,7 @@ def test_get_web():
         file1 = '/test1/test1/file1.pdf'
         file2 = '/test2/test2/file2.doc'
         file3 = '/test3/test3/file3.aspx'
-        file4 = '/test4/test4/file4.pdf'
+        file4 = '/test4/test4/file4'
         file5 = '/file5'
         file6 = '/duk.pdf'
         href1 = '<a href="%s" target="_blank"></a>' % file1
@@ -140,31 +140,23 @@ def test_get_web():
         m.get(url + file1)
         m.get(url + file2)
         m.get(url + file3)
-        m.get(url + file4, headers={'content-disposition': 'attachment; filename=file.xls'})
+        m.get(url + file4)
         m.get(url + file5)
         m.get(url + file6)
         response = get_web(url)
-        '''assert response == [
+        assert response == [
             {'website': url, 'is_data': True, 'name': 'file1.pdf',
                 'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
             {'website': url, 'is_data': True, 'name': 'file2.doc',
                 'url': url + file2, 'cached_forever': False, 'type': 'doc'},
             {'website': url, 'is_data': False, 'name': 'file3.aspx',
                 'url': url + file3, 'cached_forever': True, 'type': 'aspx'},
-            {'website': url, 'is_data': True, 'name': u'file.xls',
-                'url': url + file4, 'cached_forever': False, 'type': u'xls'},
+            {'website': url, 'is_data': False, 'name': u'file4',
+                'url': url + file4, 'cached_forever': True, 'type': 'Unknown extension'},
             {'website': url, 'is_data': False, 'name': 'file5',
                 'url': url + file5, 'cached_forever': False, 'type': 'Unknown extension'},
             {'website': url, 'is_data': False, 'name': 'duk.pdf',
-                'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]'''
-        assert response[0] == {'website': url, 'is_data': True, 'name': 'file1.pdf',
-                'url': url + file1, 'cached_forever': False, 'type': 'pdf'}
-        assert response[1] == {'website': url, 'is_data': True, 'name': 'file2.doc',
-                'url': url + file2, 'cached_forever': False, 'type': 'doc'}
-        assert response[2] == {'website': url, 'is_data': False, 'name': 'file3.aspx',
-                'url': url + file3, 'cached_forever': True, 'type': 'aspx'}
-        assert response[3] == {'website': url, 'is_data': True, 'name': u'file.xls',
-                'url': url + file4, 'cached_forever': False, 'type': 'xls'}
+                'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         m.get(url, text='test')
