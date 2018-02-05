@@ -193,7 +193,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
 
 def make_cache(url):
     new_caches = get_web(url)
-    print new_caches
+    print 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' + str(new_caches)
     if new_caches is None:
         return
     for cache_dict in new_caches:
@@ -492,7 +492,7 @@ class OdgovltHarvester(HarvesterBase):
         make_cache(ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
         for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
-            print cache_data
+            print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + str(cache_data)
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
