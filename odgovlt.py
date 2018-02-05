@@ -495,7 +495,7 @@ class OdgovltHarvester(HarvesterBase):
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
                  'format': cache_data['type']})
-        print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ' + str(ache_list_to_import)
+        print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ' + str(cache_list_to_import)
         package_dict = {
             'id': harvest_object.guid,
             'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
