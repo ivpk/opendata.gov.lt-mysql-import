@@ -9,6 +9,7 @@ import logging
 import os
 
 import mock
+import requests_mock
 import pkg_resources as pres
 import psycopg2
 import psycopg2.extensions
@@ -116,6 +117,53 @@ def app(postgres, mocker, caplog):
     pylons.translator = gettext.NullTranslations()
 
     return app
+
+
+def test_get_web():
+    with requests_mock.Mocker() as m:
+        url = 'http://test.lt'
+        file1 = '/test1/test1/file1.pdf'
+        file2 = '/test2/test2/file2.doc'
+        file3 = '/test3/test3/file3.aspx'
+        file4 = '/file4'
+        file5 = '/file5'
+        file6 = '/duk.pdf'
+        href1 = '<a href="%s" target="_blank"></a>' % file1
+        href2 = '<a href="%s" target="_blank"></a>' % file2
+        href3 = '<a href="%s" target="_blank"></a>' % file3
+        href4 = '<a href="%s" target="_blank"></a>' % file4
+        href5 = '<a href="%s" target="_blank"></a>' % file5
+        href6 = '<a href="%s" target="_blank"></a>' % file6
+        page = 'test1 test2 test3' + href1 + 'test' + href2 + href3 + href4 + href5 + \
+            'test4 test5 test6' + href6
+        m.get(url, text=page, headers={'content-type': 'text/html'})
+        m.get(url + file1)
+        m.get(url + file2)
+        m.get(url + file3)
+        m.get(url + file4, headers={'content-disposition': 'attachment; filename=file.xls'})
+        m.get(url + file5)
+        m.get(url + file6)
+        response = get_web.get_web(url)
+        assert response == [
+            {'website': url, 'is_data': True, 'name': 'file1.pdf',
+                'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
+            {'website': url, 'is_data': True, 'name': 'file2.doc',
+                'url': url + file2, 'cached_forever': False, 'type': 'doc'},
+            {'website': url, 'is_data': False, 'name': 'file3.aspx',
+                'url': url + file3, 'cached_forever': True, 'type': 'aspx'},
+            {'website': url, 'is_data': True, 'name': u'file.xls',
+                'url': url + file4, 'cached_forever': False, 'type': u'xls'},
+            {'website': url, 'is_data': False, 'name': 'file5',
+                'url': url + file5, 'cached_forever': False, 'type': 'Unknown extension'},
+            {'website': url, 'is_data': False, 'name': 'duk.pdf',
+                'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]
+    with requests_mock.Mocker() as m:
+        url = 'http://test.lt'
+        m.get(url, text='test')
+        response1 = get_web.get_web(url)
+        assert response1 is None
+        response2 = get_web.get_web('test')
+        assert response2 is None
 
 
 def test_OdgovltHarvester(app, db, mocker):
