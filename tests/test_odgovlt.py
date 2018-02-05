@@ -143,7 +143,7 @@ def test_get_web():
         m.get(url + file4, headers={'content-disposition': 'attachment; filename=file.xls'})
         m.get(url + file5)
         m.get(url + file6)
-        response = get_web.get_web(url)
+        response = get_web(url)
         assert response == [
             {'website': url, 'is_data': True, 'name': 'file1.pdf',
                 'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
@@ -160,9 +160,9 @@ def test_get_web():
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         m.get(url, text='test')
-        response1 = get_web.get_web(url)
+        response1 = get_web(url)
         assert response1 is None
-        response2 = get_web.get_web('test')
+        response2 = get_web('test')
         assert response2 is None
 
 
