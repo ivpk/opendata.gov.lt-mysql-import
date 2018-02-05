@@ -360,7 +360,8 @@ def test_OdgovltHarvester(app, db, mocker):
     reset_db()
     sync = IvpkIrsSync(db)
     mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
-    results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
+    with requests_mock.Mocker() as m:
+        results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
     assert result['report_status'] == 'added'
@@ -379,6 +380,7 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['url'] == 'http://www.testas1.lt'
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
+    print package1['resources']
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [
         {

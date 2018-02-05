@@ -166,8 +166,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                     requests.exceptions.ReadTimeout,
                     requests.exceptions.InvalidURL,
                     NameError, UnboundLocalError, AttributeError) as e:
-                log.exception(e)
-                print 'raaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                log.error(e)
                 filename = 'Unknown name'
                 type = 'Unknown type'
             try:
