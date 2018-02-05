@@ -125,7 +125,7 @@ def test_get_web():
         file1 = '/test1/test1/file1.pdf'
         file2 = '/test2/test2/file2.doc'
         file3 = '/test3/test3/file3.aspx'
-        file4 = '/file4'
+        file4 = '/test4/test4/file4.pdf'
         file5 = '/file5'
         file6 = '/duk.pdf'
         href1 = '<a href="%s" target="_blank"></a>' % file1
