@@ -360,7 +360,7 @@ def test_OdgovltHarvester(app, db, mocker):
     reset_db()
     sync = IvpkIrsSync(db)
     mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
-    with requests_mock.Mocker(real_http=True) as m:
+    with requests_mock.Mocker() as m:
         url = 'http://www.testas1.lt'
         file1 = '/test1/test1/file1.pdf'
         file2 = '/test2/test2/file2.doc'
@@ -368,6 +368,7 @@ def test_OdgovltHarvester(app, db, mocker):
         href2 = '<a href="%s" target="_blank"></a>' % file2
         page = href1 + href2
         m.register_uri('GET', url, text=page, headers={'content-type': 'text/html'})
+        m.register_uri('POST', 'http://127.0.0.1:8983/solr/update/?commit=true', real_http=True)
         results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
@@ -387,7 +388,7 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['url'] == 'http://www.testas1.lt'
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
-    print package1
+    print package1['resources']
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [
         {
