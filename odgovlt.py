@@ -193,6 +193,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
 
 def make_cache(url):
     new_caches = get_web(url)
+    print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ' + str(new_caches)
     if new_caches is None:
         return
     for cache_dict in new_caches:
