@@ -491,6 +491,7 @@ class OdgovltHarvester(HarvesterBase):
         make_cache(ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
         for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+            print cache_data
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
