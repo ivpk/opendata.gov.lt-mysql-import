@@ -140,7 +140,7 @@ def test_get_web():
         m.get(url + file1)
         m.get(url + file2)
         m.get(url + file3)
-        m.get(url + file4)
+        m.get(url + file4, headers={'content-disposition': 'attachment; filename=file.xls'})
         m.get(url + file5)
         m.get(url + file6)
         response = get_web(url)

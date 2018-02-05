@@ -144,6 +144,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                                            timeout=time,
                                            headers=headers,
                                            stream=True).headers.get('content-disposition')
+                print disposition
                 if disposition is None:
                     parse_url = requests.utils.urlparse(full_url)
                     filename = basename(parse_url.path)
