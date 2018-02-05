@@ -152,7 +152,7 @@ def test_get_web():
             {'website': url, 'is_data': False, 'name': 'file3.aspx',
                 'url': url + file3, 'cached_forever': True, 'type': 'aspx'},
             {'website': url, 'is_data': False, 'name': u'file4',
-                'url': url + file4, 'cached_forever': True, 'type': 'Unknown extension'},
+                'url': url + file4, 'cached_forever': False, 'type': 'Unknown extension'},
             {'website': url, 'is_data': False, 'name': 'file5',
                 'url': url + file5, 'cached_forever': False, 'type': 'Unknown extension'},
             {'website': url, 'is_data': False, 'name': 'duk.pdf',
