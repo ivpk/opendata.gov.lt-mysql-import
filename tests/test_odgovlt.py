@@ -368,11 +368,11 @@ def test_OdgovltHarvester(app, db, mocker):
         href2 = '<a href="%s" target="_blank"></a>' % file2
         page = href1 + href2
         m.register_uri('GET', url, text=page, headers={'content-type': 'text/html'})
-        m.register_uri('POST', ' http://127.0.0.1:8983/solr/update/?commit=true', real_http=True)
-        m.register_uri('GET', \
-            'http://127.0.0.1:8983/solr/select/?q=name%3A%227f78728dcfc6-'
-            '4f59-aea1-c701fc594ec0%22+OR+id%3A%227f78728d-cfc6-4f59-aea1-c701fc594ec0%22&f'
-            'q=site_id%3A%22localhost%22&rows=1&wt=jso', real_http=True)
+        m.register_uri('POST', 'http://127.0.0.1:8983/solr/update/?commit=true', real_http=True)
+        m.register_uri('GET',
+                       'http://127.0.0.1:8983/solr/select/?q=name%3A%227f78728dcfc6-4f59-aea1'
+                       '-c701fc594ec0%22+OR+id%3A%227f78728d-cfc6-4f59-aea1-c701fc594ec0%22&f'
+                       'q=site_id%3A%22localhost%22&rows=1&wt=jso', real_http=True)
         results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
