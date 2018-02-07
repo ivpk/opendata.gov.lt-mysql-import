@@ -393,7 +393,12 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['url'] == 'http://www.testas1.lt'
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
-    print 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' + str(package1['resources'])
+    assert package1['resources'][0]['name'] == 'file1.pdf'
+    assert package1['resources'][0]['format'] == 'PDF'
+    assert package1['resources'][0]['url'] == 'http://www.testas2.lt/test1/test1/file1.pdf'
+    assert package1['resources'][1]['name'] == 'file2.doc'
+    assert package1['resources'][1]['format'] == 'DOC'
+    assert package1['resources'][1]['url'] == 'http://www.testas2.lt/test2/test2/file2.doc'
     print 'cccccccccccccccccccccccccccccccc' + str(package2['resources'])
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [

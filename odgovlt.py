@@ -31,9 +31,6 @@ import urlparse
 
 log = logging.getLogger(__name__)
 cache = Cache('sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__)))
-print 'cccccccccccccccccccccccccccccccccccccccccccccccccc sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__))
-os.system('ls cache')
-os.system('ls tests')
 
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
@@ -499,7 +496,6 @@ class OdgovltHarvester(HarvesterBase):
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
                  'format': cache_data['type']})
-        print 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' + str(cache.get_all())
         package_dict = {
             'id': harvest_object.guid,
             'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
