@@ -394,6 +394,7 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
     print 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' + str(package1['resources'])
+    print 'cccccccccccccccccccccccccccccccc' + str(package2['resources'])
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [
         {
