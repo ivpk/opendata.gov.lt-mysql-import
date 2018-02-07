@@ -69,4 +69,3 @@ def test_cache():
     assert all_data[0]['type'] == cache_dict2['type']
     assert all_data[0]['cached_forever'] == cache_dict2['cached_forever']
     assert all_data[0]['is_data'] == cache_dict2['is_data']
-    cache.__reset__()
