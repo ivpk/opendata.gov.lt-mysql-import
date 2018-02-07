@@ -360,7 +360,7 @@ def test_OdgovltHarvester(app, db, mocker):
     reset_db()
     sync = IvpkIrsSync(db)
     mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
-    '''with requests_mock.Mocker(real_http=True) as m:
+    with requests_mock.Mocker(real_http=True) as m:
         url1 = 'http://www.testas1.lt'
         url2 = 'http://www.testas2.lt'
         file1 = '/test1/test1/file1.pdf'
@@ -369,7 +369,7 @@ def test_OdgovltHarvester(app, db, mocker):
         href2 = '<a href="%s" target="_blank"></a>' % file2
         page = href1 + href2
         m.get(url1, text=page, headers={'content-type': 'text/html'})
-        m.get(url2, text=page, headers={'content-type': 'text/html'})'''
+        m.get(url2, text=page, headers={'content-type': 'text/html'})
     results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
