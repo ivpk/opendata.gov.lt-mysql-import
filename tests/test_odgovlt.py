@@ -371,6 +371,8 @@ def test_OdgovltHarvester(app, db, mocker):
         m.get(url1, text=page, headers={'content-type': 'text/html'})
         m.get(url2, text=page, headers={'content-type': 'text/html'})
         m.get(url1 + file1, text=page)
+        m.get(url1 + file2, text=page)
+        m.get(url2 + file1, text=page)
         m.get(url2 + file2, text=page)
         results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
