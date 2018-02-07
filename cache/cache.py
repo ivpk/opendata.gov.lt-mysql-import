@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 class Cache(object):
 
-    def __init__(self, db='sqlite:///%s/cache.db' % os.path.dirname(__file__)):
+    def __init__(self, db):
         global conn
         global metadata
         global data
