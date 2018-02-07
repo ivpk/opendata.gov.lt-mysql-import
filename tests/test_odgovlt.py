@@ -370,7 +370,7 @@ def test_OdgovltHarvester(app, db, mocker):
         page = href1 + href2
         m.get(url1, text=page, headers={'content-type': 'text/html'})
         m.get(url2, text=page, headers={'content-type': 'text/html'})
-    results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
+        results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
     assert result['report_status'] == 'added'

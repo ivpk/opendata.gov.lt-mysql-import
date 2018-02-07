@@ -7,8 +7,6 @@ from cache.cache import Cache
 def test_cache():
     path = 'sqlite:///%s/test_cache.db' % os.path.dirname(os.path.abspath(__file__))
     cache = Cache(path)
-    os.system('ls cache')
-    os.system('ls tests')
     cache.__reset__()
     engine = sa.create_engine(path)
     metadata = sa.MetaData(engine)
