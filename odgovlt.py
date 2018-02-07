@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+from os.path import basename, splitext
+import os
 import collections
 import datetime
 import itertools
@@ -21,7 +23,6 @@ from ckanext.harvest.model import HarvestObject
 from pylons import config
 from lxml import html
 from cache.cache import Cache
-from os.path import basename, splitext
 import requests
 import lxml
 import rfc6266
