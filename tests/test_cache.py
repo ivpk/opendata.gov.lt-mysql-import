@@ -5,9 +5,10 @@ from cache.cache import Cache
 
 
 def test_cache():
-    cache = Cache('sqlite:///%s/test_cache.db' % os.path.dirname(__file__))
+    path = 'sqlite:///%s/test_cache.db' % os.path.dirname(os.path.abspath(__file__))
+    cache = Cache(path)
     cache.__reset__()
-    engine = sa.create_engine('sqlite:///%s/test_cache.db' % os.path.dirname(__file__))
+    engine = sa.create_engine(path)
     metadata = sa.MetaData(engine)
     metadata.reflect(bind=engine)
     data = metadata.tables['data']
