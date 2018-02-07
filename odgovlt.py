@@ -30,8 +30,7 @@ import urlparse
 
 
 log = logging.getLogger(__name__)
-cache = Cache('sqlite:///%s/cache.db' % os.path.dirname(os.path.abspath(__file__)))
-os.system('ls %s' % os.path.dirname(os.path.abspath(__file__)))
+cache = Cache('sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__)))
 
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
