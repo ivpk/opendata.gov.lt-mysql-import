@@ -395,11 +395,10 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package1['maintainer_email'] == 'testas1@testas1.com'
     assert package1['resources'][0]['name'] == 'file1.pdf'
     assert package1['resources'][0]['format'] == 'PDF'
-    assert package1['resources'][0]['url'] == 'http://www.testas2.lt/test1/test1/file1.pdf'
+    assert package1['resources'][0]['url'] == 'http://www.testas1.lt/test1/test1/file1.pdf'
     assert package1['resources'][1]['name'] == 'file2.doc'
     assert package1['resources'][1]['format'] == 'DOC'
-    assert package1['resources'][1]['url'] == 'http://www.testas2.lt/test2/test2/file2.doc'
-    print 'cccccccccccccccccccccccccccccccc' + str(package2['resources'])
+    assert package1['resources'][1]['url'] == 'http://www.testas1.lt/test2/test2/file2.doc'
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [
         {
@@ -416,6 +415,12 @@ def test_OdgovltHarvester(app, db, mocker):
     assert package2['url'] == 'http://www.testas2.lt'
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
+    assert package2['resources'][0]['name'] == 'file1.pdf'
+    assert package2['resources'][0]['format'] == 'PDF'
+    assert package2['resources'][0]['url'] == 'http://www.testas2.lt/test1/test1/file1.pdf'
+    assert package2['resources'][1]['name'] == 'file2.doc'
+    assert package2['resources'][1]['format'] == 'DOC'
+    assert package2['resources'][1]['url'] == 'http://www.testas2.lt/test2/test2/file2.doc'
     assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
     assert package2['groups'] == [
         {
