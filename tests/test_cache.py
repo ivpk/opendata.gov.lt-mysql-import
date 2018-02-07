@@ -6,9 +6,9 @@ from cache.cache import Cache
 
 def test_cache():
     path = 'sqlite:///%s/test_cache.db' % os.path.dirname(os.path.abspath(__file__))
+    cache = Cache(path)
     os.system('ls cache')
     os.system('ls tests')
-    cache = Cache(path)
     cache.__reset__()
     engine = sa.create_engine(path)
     metadata = sa.MetaData(engine)
@@ -71,3 +71,4 @@ def test_cache():
     assert all_data[0]['type'] == cache_dict2['type']
     assert all_data[0]['cached_forever'] == cache_dict2['cached_forever']
     assert all_data[0]['is_data'] == cache_dict2['is_data']
+    cache.__reset__()
