@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+from os.path import basename, splitext
+import os
 import collections
 import datetime
 import itertools
@@ -19,8 +21,16 @@ from ckan.plugins import toolkit
 from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
 from pylons import config
+from lxml import html
+from cache.cache import Cache
+import requests
+import lxml
+import rfc6266
+import urlparse
+
 
 log = logging.getLogger(__name__)
+cache = Cache('sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__)))
 
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
@@ -92,6 +102,105 @@ def get_package_tags(r_zodziai):
             else:
                 name_list.append(name)
     return name_list
+
+
+def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
+    cache_dict = {}
+    cache_list = []
+    substring = [
+        'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx',
+        'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
+    not_allowed_substring = [
+        'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
+    try:
+        page = requests.get(base_url, timeout=time, headers=headers)
+        tree = html.fromstring(page.content)
+        type = page.headers.get('content-type')
+        op = type.startswith('text/html')
+        page.close()
+    except (
+            requests.exceptions.InvalidSchema,
+            requests.exceptions.MissingSchema,
+            requests.exceptions.ConnectionError,
+            lxml.etree.ParserError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ReadTimeout,
+            requests.exceptions.InvalidURL,
+            AttributeError) as e:
+        log.exception(e)
+        return
+    if not op:
+        return
+    path = tree.xpath('//@href')
+    for current in path:
+        full_url = urlparse.urljoin(base_url, current)
+        url_dict = {
+            'website': base_url,
+            'url': full_url}
+        if not cache.__contains__(url_dict):
+            cache_dict['website'] = base_url
+            cache_dict['url'] = full_url
+            try:
+                disposition = requests.get(full_url,
+                                           timeout=time,
+                                           headers=headers,
+                                           stream=True).headers.get('content-disposition')
+                if disposition is None:
+                    parse_url = requests.utils.urlparse(full_url)
+                    filename = basename(parse_url.path)
+                else:
+                    try:
+                        filename = rfc6266.parse_headers(disposition).filename_unsafe
+                    except ValueError as e:
+                        log.error(e)
+                        try:
+                            filename = re.findall("filename=(.+)", disposition)[0]
+                        except IndexError as e:
+                            log.error(e)
+                type = splitext(filename)[1][1:].lower()
+                if not type:
+                    type = 'Unknown extension'
+            except (
+                    requests.exceptions.InvalidSchema,
+                    requests.exceptions.ChunkedEncodingError,
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ReadTimeout,
+                    requests.exceptions.InvalidURL,
+                    NameError, UnboundLocalError, AttributeError) as e:
+                log.error(e)
+                filename = 'Unknown name'
+                type = 'Unknown type'
+            try:
+                cache_dict['name'] = filename
+                cache_dict['type'] = type
+                if type == 'Unknown extension':
+                    cache_dict['is_data'] = False
+                    cache_dict['cached_forever'] = False
+                elif any(x in type for x in substring) and not any(x in full_url for x in not_allowed_substring):
+                    cache_dict['is_data'] = True
+                    cache_dict['cached_forever'] = False
+                else:
+                    cache_dict['is_data'] = False
+                    cache_dict['cached_forever'] = True
+            except (NameError, TypeError, AttributeError, UnboundLocalError) as e:
+                log.error(e)
+                cache_dict['name'] = 'Unknown name'
+                cache_dict['type'] = 'Unknown type'
+                cache_dict['is_data'] = False
+                cache_dict['cached_forever'] = False
+            cache_list.append(dict(cache_dict))
+    return cache_list
+
+
+def make_cache(url):
+    new_caches = get_web(url)
+    if new_caches is None:
+        return
+    for cache_dict in new_caches:
+        try:
+            cache.update(cache_dict)
+        except KeyError as e:
+            log.error(e)
 
 
 class CkanAPI(object):
@@ -380,6 +489,13 @@ class OdgovltHarvester(HarvesterBase):
         organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
         sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
 
+        make_cache(ivpk_dataset['TINKLAPIS'])
+        cache_list_to_import = []
+        for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+            cache_list_to_import.append(
+                {'url': cache_data['url'],
+                 'name': cache_data['name'],
+                 'format': cache_data['type']})
         package_dict = {
             'id': harvest_object.guid,
             'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
@@ -390,6 +506,7 @@ class OdgovltHarvester(HarvesterBase):
             'maintainer_email': ivpk_dataset['K_EMAIL'],
             'owner_org': organization['name'],
             'state': 'active',
+            'resources': cache_list_to_import,
             'tags': [
                 {'name': tag}
                 for tag in get_package_tags(ivpk_dataset['R_ZODZIAI'])

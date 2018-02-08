@@ -12,6 +12,6 @@ before_script:
   - sudo service jetty start
 script:
   - rst2html.py --strict README.rst /dev/null
-  - flake8 --max-line-length=120 odgovlt.py tests
+  - flake8 --max-line-length=120 odgovlt.py tests cache
   - make test
   
