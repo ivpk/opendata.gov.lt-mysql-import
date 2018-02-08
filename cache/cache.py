@@ -82,15 +82,13 @@ class Cache(object):
 
     def remove_old(self, days=30):
         self.time_now = datetime.datetime.now()
-        remove = data.delete().where(
-             self.time_now - data.c.date_accessed == days).where(
-             data.c.cached_forever is False)
+        remove = data.delete().where(self.time_now - data.c.date_accessed == days).where(not data.c.cached_forever)
         self.res = conn.execute(remove)
         self.res.close()
 
     def get_url_data(self, website):
         data_list = []
-        clause = data.select().where(data.c.website == website).where(data.c.is_data is True)
+        clause = data.select().where(data.c.website == website).where(data.c.is_data)
         for row in conn.execute(clause):
             data_list.append(dict(row))
         return data_list
@@ -104,7 +102,7 @@ class Cache(object):
 
     def get_all_data(self):
         data_list = []
-        clause = data.select().where(data.c.is_data is True)
+        clause = data.select().where(data.c.is_data)
         for row in conn.execute(clause):
             data_list.append(dict(row))
         return data_list
