@@ -1,11 +1,10 @@
-import sqlite3
 import sqlalchemy as sa
 import datetime
 import logging
-import os
 
 logging.info('Starting logger for cache')
 log = logging.getLogger(__name__)
+
 
 class Cache(object):
 
@@ -16,18 +15,17 @@ class Cache(object):
         conn = sa.create_engine(db)
         conn.echo = False
         metadata = sa.MetaData(conn)
-        metadata.reflect(bind = conn)
+        metadata.reflect(bind=conn)
         try:
             create_data = sa.Table('data', metadata,
-                sa.Column('id', sa.Integer, primary_key = True),
-                sa.Column('website', sa.String(200)),
-                sa.Column('url', sa.String(200)),
-                sa.Column('name', sa.String(200)),
-                sa.Column('date_accessed', sa.DateTime),
-                sa.Column('is_data', sa.Boolean),
-                sa.Column('type', sa.String(100)),
-                sa.Column('cached_forever', sa.Boolean)
-            )
+                                   sa.Column('id', sa.Integer, primary_key=True),
+                                   sa.Column('website', sa.String(200)),
+                                   sa.Column('url', sa.String(200)),
+                                   sa.Column('name', sa.String(200)),
+                                   sa.Column('date_accessed', sa.DateTime),
+                                   sa.Column('is_data', sa.Boolean),
+                                   sa.Column('type', sa.String(100)),
+                                   sa.Column('cached_forever', sa.Boolean))
             create_data.create()
         except sa.exc.InvalidRequestError:
             log.error('Table already exists.')
@@ -71,34 +69,34 @@ class Cache(object):
             update = data.insert()
             try:
                 self.res = update.execute(
-                     website = new_website,
-                     url = new_url, 
-                     name = new_name,
-                     date_accessed = datetime.datetime.now(),
-                     is_data = new_is_data,
-                     type = url_type,
-                     cached_forever = new_cached_forever)
+                     website=new_website,
+                     url=new_url,
+                     name=new_name,
+                     date_accessed=datetime.datetime.now(),
+                     is_data=new_is_data,
+                     type=url_type,
+                     cached_forever=new_cached_forever)
                 self.res.close()
             except sa.exc.ProgrammingError as e:
                 log.error(e)
 
-    def remove_old(self, days = 30):
+    def remove_old(self, days=30):
         self.time_now = datetime.datetime.now()
         remove = data.delete().where(
              self.time_now - data.c.date_accessed == days).where(
-             data.c.cached_forever == False)
+             data.c.cached_forever is False)
         self.res = conn.execute(remove)
         self.res.close()
 
     def get_url_data(self, website):
         data_list = []
-        clause = data.select().where(data.c.website == website).where(data.c.is_data == True)
+        clause = data.select().where(data.c.website == website).where(data.c.is_data is True)
         for row in conn.execute(clause):
             data_list.append(dict(row))
         return data_list
 
     def get_all(self):
-        clause = data.select() 
+        clause = data.select()
         data_to_return = []
         for row in conn.execute(clause):
             data_to_return.append(dict(row))
@@ -106,7 +104,7 @@ class Cache(object):
 
     def get_all_data(self):
         data_list = []
-        clause = data.select().where(data.c.is_data == True)
+        clause = data.select().where(data.c.is_data is True)
         for row in conn.execute(clause):
             data_list.append(dict(row))
         return data_list
