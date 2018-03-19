@@ -1,10 +1,11 @@
-env/bin/py.test: env/bin/pip requirements-dev.txt
+env/.done: env/bin/pip setup.py requirements-dev.txt
 	env/bin/pip install -e .
 	env/bin/pip install -r requirements-dev.txt
 	env/bin/pip install -r env/src/ckan/requirements.txt
 	env/bin/pip install -r env/src/ckan/dev-requirements.txt
 	env/bin/pip install -r env/src/ckanext-harvest/pip-requirements.txt
 	env/bin/pip install -r env/src/ckanext-harvest/dev-requirements.txt
+	touch env/.done
 
 env/bin/pip-tools: env/bin/pip
 	env/bin/pip install pip-tools
@@ -21,7 +22,7 @@ requirements-dev.txt: requirements-dev.in
 
 .PHONY: test
 test: env/bin/py.test
-	env/bin/py.test -vv --tb=native --cov-report=term-missing --cov=odgovlt tests
+	env/bin/py.test -vvx --tb=native --cov-report=term-missing --cov=odgovlt tests
 
 .PHONY: tags
 tags:

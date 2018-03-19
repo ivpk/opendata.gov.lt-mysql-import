@@ -11,6 +11,7 @@ setup(
         'Unidecode',
         'sqlalchemy',
         'PyMySQL',
+        'rfc6266',
     ],
     extras_require={
         'tests': [

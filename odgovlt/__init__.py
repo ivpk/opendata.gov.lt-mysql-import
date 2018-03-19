@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import, print_function
 
-from os.path import basename, splitext
 import os
 import collections
 import datetime
@@ -11,9 +10,15 @@ import json
 import logging
 import re
 import string
+import tempfile
 
+import lxml
+import lxml.html
+import requests
+import rfc6266
 import sqlalchemy as sa
 import unidecode
+import urlparse
 
 from ckan import model
 from ckan.logic import NotFound
@@ -21,16 +26,11 @@ from ckan.plugins import toolkit
 from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
 from pylons import config
-from lxml import html
-from cache.cache import Cache
-import requests
-import lxml
-import rfc6266
-import urlparse
+
+from odgovlt.cache import Cache
 
 
 log = logging.getLogger(__name__)
-cache = Cache('sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__)))
 
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
@@ -104,7 +104,11 @@ def get_package_tags(r_zodziai):
     return name_list
 
 
-def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
+def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}, cache=None):
+    urlp = urlparse.urlparse(base_url)
+    if urlp.scheme not in ('http', 'https'):
+        return
+
     cache_dict = {}
     cache_list = []
     substring = [
@@ -114,7 +118,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
         'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
     try:
         page = requests.get(base_url, timeout=time, headers=headers)
-        tree = html.fromstring(page.content)
+        tree = lxml.html.fromstring(page.content)
         type = page.headers.get('content-type')
         op = type.startswith('text/html')
         page.close()
@@ -134,10 +138,14 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
     path = tree.xpath('//@href')
     for current in path:
         full_url = urlparse.urljoin(base_url, current)
+        urlp = urlparse.urlparse(full_url)
+        if urlp.scheme not in ('http', 'https'):
+            continue
         url_dict = {
             'website': base_url,
-            'url': full_url}
-        if not cache.__contains__(url_dict):
+            'url': full_url,
+        }
+        if url_dict not in cache:
             cache_dict['website'] = base_url
             cache_dict['url'] = full_url
             try:
@@ -147,7 +155,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                                            stream=True).headers.get('content-disposition')
                 if disposition is None:
                     parse_url = requests.utils.urlparse(full_url)
-                    filename = basename(parse_url.path)
+                    filename = os.path.basename(parse_url.path)
                 else:
                     try:
                         filename = rfc6266.parse_headers(disposition).filename_unsafe
@@ -157,7 +165,7 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
                             filename = re.findall("filename=(.+)", disposition)[0]
                         except IndexError as e:
                             log.error(e)
-                type = splitext(filename)[1][1:].lower()
+                type = os.path.splitext(filename)[1][1:].lower()
                 if not type:
                     type = 'Unknown extension'
             except (
@@ -192,8 +200,8 @@ def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
     return cache_list
 
 
-def make_cache(url):
-    new_caches = get_web(url)
+def make_cache(cache, url):
+    new_caches = get_web(url, cache=cache)
     if new_caches is None:
         return
     for cache_dict in new_caches:
@@ -453,6 +461,12 @@ class IvpkIrsSync(object):
 
 class OdgovltHarvester(HarvesterBase):
 
+    def __init__(self, **kwargs):
+        super(HarvesterBase, self).__init__(**kwargs)
+        cache_path = os.path.join(config.get('cache.dir', tempfile.gettempdir()), 'odgovlt.cache.db')
+        log.debug('odgovlt package resources cache: %s', cache_path)
+        self.cache = Cache('sqlite:///' + cache_path)
+
     def info(self):
         return {
             'name': 'opendata-gov-lt',
@@ -489,9 +503,9 @@ class OdgovltHarvester(HarvesterBase):
         organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
         sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
 
-        make_cache(ivpk_dataset['TINKLAPIS'])
+        make_cache(self.cache, ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
-        for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+        for cache_data in self.cache.get_url_data(ivpk_dataset['TINKLAPIS']):
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],

@@ -29,6 +29,7 @@ from ckanext.harvest.tests.factories import HarvestObjectObj
 from ckanext.harvest.tests.factories import HarvestSourceObj
 from ckanext.harvest.tests.lib import run_harvest
 
+from odgovlt.cache import Cache
 from odgovlt import CkanAPI
 from odgovlt import DatetimeEncoder
 from odgovlt import OdgovltHarvester
@@ -119,7 +120,9 @@ def app(postgres, mocker, caplog):
     return app
 
 
-def test_get_web():
+def test_get_web(tmpdir):
+    cache = Cache('sqlite:///%s' % tmpdir.join('odgovlt.cache.db'))
+
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         file1 = '/test1/test1/file1.pdf'
@@ -143,7 +146,7 @@ def test_get_web():
         m.get(url + file4)
         m.get(url + file5)
         m.get(url + file6)
-        response = get_web(url)
+        response = get_web(url, cache=cache)
         assert response == [
             {'website': url, 'is_data': True, 'name': 'file1.pdf',
                 'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
