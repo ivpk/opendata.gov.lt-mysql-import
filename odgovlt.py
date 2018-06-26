@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
-from os.path import basename, splitext
-import os
+from os.path import basename
 import collections
 import datetime
 import itertools
@@ -11,6 +10,10 @@ import json
 import logging
 import re
 import string
+import cgi
+import mimetypes
+import robotparser
+import urllib
 
 import sqlalchemy as sa
 import unidecode
@@ -25,12 +28,12 @@ from lxml import html
 from cache.cache import Cache
 import requests
 import lxml
-import rfc6266
 import urlparse
+
+requests.packages.urllib3.disable_warnings()
 
 
 log = logging.getLogger(__name__)
-cache = Cache('sqlite:///%s/cache/cache.db' % os.path.dirname(os.path.abspath(__file__)))
 
 CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
@@ -104,99 +107,191 @@ def get_package_tags(r_zodziai):
     return name_list
 
 
-def get_web(base_url, time=20, headers={'User-Agent': 'Custom user agent'}):
-    cache_dict = {}
-    cache_list = []
-    substring = [
-        'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx',
-        'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt', 'xla', 'xlw', 'ods']
-    not_allowed_substring = [
-        'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas']
+def get_top_level_domain(netloc):
+    if '.' in netloc:
+        split = netloc.lower().split('.')
+        return '.'.join(split[-2:])
+    else:
+        return ''
+
+
+def getext(value):
+    parts = value.lower().split('.')
+    if len(parts) <= 1 or parts[0] == '':
+        return ''
+
+    result = []
+    for part in parts[1:][-2:][::-1]:
+        if part and re.match(r'^[a-z0-9]{1,5}$', part) and not part.isdigit():
+            result.append(part)
+        else:
+            break
+    return '.'.join(result[::-1])
+
+
+def check_url(base_url, full_url, robots=None, cache=None):
+    # Skip unknown protocols
+    purl = requests.utils.urlparse(full_url)
+    if purl.scheme not in ('http', 'https', ''):
+        return False
+
+    # Skip all external urls
+    base_purl = requests.utils.urlparse(base_url)
+    base_domain = get_top_level_domain(base_purl.netloc)
+    if base_domain != getext(purl.netloc):
+        return False
+
+    # Skip all urls restricted by robots.txt
+    if robots and not robots.can_fetch('odgovlt', full_url.encode('utf-8')):
+        return False
+
+    # Skip cached urls
+    if cache:
+        url_dict = {'website': base_url, 'url': full_url}
+        if url_dict in cache:
+            return False
+
+    return True
+
+
+KNOWN_FILE_TYPES = [
+    'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx', 'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt',
+    'xla', 'xlw', 'ods'
+]
+
+IGNORE_FILE_TYPES = [
+    'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas'
+]
+
+
+def guess_resource(resp, base_url, full_url):
+    filename = ''
+    filetype = ''
+    purl = requests.utils.urlparse(full_url)
+    headers = dict(resp.headers)
+
+    # Guess filename from content-disposition header
+    disposition = headers.get('content-disposition')
+    if disposition:
+        value, params = cgi.parse_header(disposition)
+        filename = params.get('filename', '')
+
+    # Guess filename from content-type
+    content_type = headers.get('content-type')
+    if not filename and content_type:
+        value, params = cgi.parse_header(content_type)
+        filename = mimetypes.guess_extension(value)
+        if filename:
+            filename = urllib.unquote(basename(purl.path) + filename)
+
+    # Guess filename from url path
+    if not filename:
+        filename = urllib.unquote(basename(purl.path))
+
+    # Guess file format from guess filename
+    if filename:
+        filetype = getext(filename)
+
+    if filetype == '':
+        is_data = False
+        cached_forever = False
+
+    elif any(x in filetype for x in KNOWN_FILE_TYPES) and not any(x in full_url for x in IGNORE_FILE_TYPES):
+        is_data = True
+        cached_forever = False
+
+    else:
+        is_data = False
+        cached_forever = True
+
+    return {
+        'website': base_url,
+        'url': full_url,
+        'name': filename,
+        'type': filetype,
+        'is_data': is_data,
+        'cached_forever': cached_forever,
+    }
+
+
+def progressbar(items):
+    for item in items:
+        yield item
+
+
+def guess_resource_urls(cache, base_url, timeout=20, headers=None, progressbar=progressbar):
+    headers = headers or {'User-Agent': 'odgovlt'}
+    session = requests.Session()
+    session.headers.update(headers)
+    session.timeout = timeout
+    session.verify = False
+
+    base_purl = requests.utils.urlparse(base_url)
+    robots = robotparser.RobotFileParser(base_purl.scheme + '://' + base_purl.netloc + '/robots.txt')
     try:
-        page = requests.get(base_url, timeout=time, headers=headers)
-        tree = html.fromstring(page.content)
-        type = page.headers.get('content-type')
-        op = type.startswith('text/html')
-        page.close()
-    except (
-            requests.exceptions.InvalidSchema,
+        robots.read()
+    except IOError:
+        pass
+
+    if not check_url(base_url, base_url, robots):
+        return
+
+    try:
+        resp = session.get(base_url)
+        tree = html.fromstring(resp.content)
+    except (requests.exceptions.InvalidSchema,
             requests.exceptions.MissingSchema,
             requests.exceptions.ConnectionError,
             lxml.etree.ParserError,
             requests.exceptions.ChunkedEncodingError,
             requests.exceptions.ReadTimeout,
             requests.exceptions.InvalidURL,
-            AttributeError) as e:
-        log.exception(e)
+            AttributeError,
+            IOError) as e:
+        log.warning("error while fetching and parsing base url: %s", e)
         return
-    if not op:
+
+    content_type = resp.headers.get('content-type')
+    if content_type and not content_type.startswith(('text/html', 'text/xhtml')):
+        # If base url itself is not an html page, then it might be a resource.
+        yield guess_resource(resp, base_url, base_url)
         return
-    path = tree.xpath('//@href')
-    for current in path:
-        full_url = urlparse.urljoin(base_url, current)
-        url_dict = {
-            'website': base_url,
-            'url': full_url}
-        if not cache.__contains__(url_dict):
-            cache_dict['website'] = base_url
-            cache_dict['url'] = full_url
-            try:
-                disposition = requests.get(full_url,
-                                           timeout=time,
-                                           headers=headers,
-                                           stream=True).headers.get('content-disposition')
-                if disposition is None:
-                    parse_url = requests.utils.urlparse(full_url)
-                    filename = basename(parse_url.path)
-                else:
-                    try:
-                        filename = rfc6266.parse_headers(disposition).filename_unsafe
-                    except ValueError as e:
-                        log.error(e)
-                        try:
-                            filename = re.findall("filename=(.+)", disposition)[0]
-                        except IndexError as e:
-                            log.error(e)
-                type = splitext(filename)[1][1:].lower()
-                if not type:
-                    type = 'Unknown extension'
-            except (
-                    requests.exceptions.InvalidSchema,
-                    requests.exceptions.ChunkedEncodingError,
-                    requests.exceptions.ConnectionError,
-                    requests.exceptions.ReadTimeout,
-                    requests.exceptions.InvalidURL,
-                    NameError, UnboundLocalError, AttributeError) as e:
-                log.error(e)
-                filename = 'Unknown name'
-                type = 'Unknown type'
-            try:
-                cache_dict['name'] = filename
-                cache_dict['type'] = type
-                if type == 'Unknown extension':
-                    cache_dict['is_data'] = False
-                    cache_dict['cached_forever'] = False
-                elif any(x in type for x in substring) and not any(x in full_url for x in not_allowed_substring):
-                    cache_dict['is_data'] = True
-                    cache_dict['cached_forever'] = False
-                else:
-                    cache_dict['is_data'] = False
-                    cache_dict['cached_forever'] = True
-            except (NameError, TypeError, AttributeError, UnboundLocalError) as e:
-                log.error(e)
-                cache_dict['name'] = 'Unknown name'
-                cache_dict['type'] = 'Unknown type'
-                cache_dict['is_data'] = False
-                cache_dict['cached_forever'] = False
-            cache_list.append(dict(cache_dict))
-    return cache_list
+
+    # Visit all links found in base url and look for possible resource links.
+    for href in progressbar(tree.xpath('//@href')):
+        full_url = urlparse.urljoin(base_url, href)
+
+        if not check_url(base_url, full_url, robots, cache):
+            continue
+
+        resp = None
+        try:
+            resp = session.get(full_url, stream=True)
+
+        except (requests.exceptions.InvalidSchema,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ReadTimeout,
+                requests.exceptions.InvalidURL,
+                NameError, UnboundLocalError, AttributeError, IOError) as e:
+            log.warning("error while fetching and parsing page url: %s", e)
+
+        else:
+            yield guess_resource(resp, base_url, full_url)
+
+        finally:
+            if resp:
+                resp.close()
 
 
-def make_cache(url):
-    new_caches = get_web(url)
-    if new_caches is None:
-        return
-    for cache_dict in new_caches:
+def get_web(cache, base_url, timeout=20, headers=None, progressbar=progressbar):
+    return [
+        data for data in guess_resource_urls(cache, base_url, timeout, headers, progressbar)
+    ]
+
+
+def make_cache(cache, url):
+    for cache_dict in get_web(cache, url):
         try:
             cache.update(cache_dict)
         except KeyError as e:
@@ -445,13 +540,20 @@ class IvpkIrsSync(object):
     def get_ivpk_datasets(self):
         query = (
             sa.select([self.t.rinkmena]).
-            where(self.t.rinkmena.c.STATUSAS == 'U')
+            where(self.t.rinkmena.c.STATUSAS == 'U').
+            where(self.t.rinkmena.c.GALIOJA == 'T')
         )
         for ivpk_dataset in self.engine.execute(query):
             yield ivpk_dataset
 
 
 class OdgovltHarvester(HarvesterBase):
+
+    def __init__(self, *args, **kwargs):
+        super(HarvesterBase, self).__init__(*args, **kwargs)
+        cache_dir = 'sqlite:///%s/cache.db' % config.get('cache_dir', '/tmp')
+        log.info('odgovlt cache dir: %s', cache_dir)
+        self._cache = Cache(cache_dir)
 
     def info(self):
         return {
@@ -489,9 +591,9 @@ class OdgovltHarvester(HarvesterBase):
         organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
         sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
 
-        make_cache(ivpk_dataset['TINKLAPIS'])
+        make_cache(self._cache, ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
-        for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+        for cache_data in self._cache.get_url_data(ivpk_dataset['TINKLAPIS']):
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
