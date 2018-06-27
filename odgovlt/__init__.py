@@ -40,6 +40,7 @@ CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
 SOURCE_ID_KEY = 'Šaltinio ID'
 SOURCE_NAME = 'Šaltinis'
+SOURCE_URL = 'Šaltinio nuoroda'
 SOURCE_IVPK_IRS = 'IVPK IRS'
 
 
@@ -630,6 +631,7 @@ class OdgovltHarvester(HarvesterBase):
             'extras': [
                 {'key': SOURCE_NAME, 'value': SOURCE_IVPK_IRS},
                 {'key': SOURCE_ID_KEY, 'value': ivpk_dataset['ID']},
+                {'key': SOURCE_URL, 'value': 'http://opendata.gov.lt/index.php?vars=/public/public/print/%s/' % ivpk_dataset['ID']},
                 {'key': CODE_KEY, 'value': ivpk_dataset['KODAS']},
             ],
         }
