@@ -4,3 +4,4 @@
 tags
 /env/
 .coverage
+/tests/test_cache.db

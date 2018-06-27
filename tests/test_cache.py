@@ -1,7 +1,7 @@
 import os
 
 import sqlalchemy as sa
-from cache.cache import Cache
+from odgovlt.cache import Cache
 
 
 def test_cache():
