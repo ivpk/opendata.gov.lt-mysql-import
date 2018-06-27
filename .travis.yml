@@ -1,8 +1,6 @@
 language: python
 python:
   - "2.7"
-services:
-  - postgresql
 addons:
   postgresql: "9.3"
 install:
@@ -10,7 +8,7 @@ install:
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
   - psql -U postgres -c "CREATE USER ckan WITH PASSWORD 'ckan';"
-  - psql -U postgres -C 'GRANT ALL PRIVILEGES ON DATABASE "odgovlt_mysql_import_tests" to ckan';
+  - psql -U postgres -c 'GRANT ALL PRIVILEGES ON DATABASE "odgovlt_mysql_import_tests" to ckan';
   - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
   - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' /etc/default/jetty
   - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' /etc/default/jetty
