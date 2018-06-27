@@ -548,13 +548,21 @@ class IvpkIrsSync(object):
             yield ivpk_dataset
 
 
-class OdgovltHarvester(HarvesterBase):
+_cache = None
 
-    def __init__(self, *args, **kwargs):
-        super(HarvesterBase, self).__init__(*args, **kwargs)
-        cache_dir = 'sqlite:///%s/cache.db' % config.get('cache_dir', '/tmp')
-        log.info('odgovlt cache dir: %s', cache_dir)
-        self._cache = Cache(cache_dir)
+
+def get_cache_manager():
+    global _cache
+
+    if _cache is None:
+        cache_db_file = 'sqlite:///%s/odgovlt.cache.db' % config.get('cache_dir', '/tmp')
+        log.info('odgovlt cache dir: %s', cache_db_file)
+        _cache = Cache(cache_db_file)
+
+    return _cache
+
+
+class OdgovltHarvester(HarvesterBase):
 
     def info(self):
         return {
@@ -592,9 +600,10 @@ class OdgovltHarvester(HarvesterBase):
         organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
         sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
 
-        make_cache(self._cache, ivpk_dataset['TINKLAPIS'])
+        cache = get_cache_manager()
+        make_cache(cache, ivpk_dataset['TINKLAPIS'])
         cache_list_to_import = []
-        for cache_data in self._cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+        for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
             cache_list_to_import.append(
                 {'url': cache_data['url'],
                  'name': cache_data['name'],
