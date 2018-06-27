@@ -166,7 +166,7 @@ def guess_resource(resp, base_url, full_url):
     filename = ''
     filetype = ''
     purl = requests.utils.urlparse(full_url)
-    headers = dict(resp.headers)
+    headers = resp.headers
 
     # Guess filename from content-disposition header
     disposition = headers.get('content-disposition')

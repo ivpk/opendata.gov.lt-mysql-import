@@ -12,5 +12,6 @@ unidecode
 polib
 flask-babel
 factory-boy==2.3.1
+tqdm
 -e git+https://github.com/ckan/ckan.git#egg=ckan
 -e git+https://github.com/ckan/ckanext-harvest.git#egg=ckanext-harvest
