@@ -138,14 +138,6 @@ def check_url(base_url, full_url, robots=None, cache=None):
         log.debug("unknown URL scheme %r, skip.", purl.scheme)
         return False
 
-    # Skip all external urls
-    base_purl = requests.utils.urlparse(base_url)
-    base_domain = get_top_level_domain(base_purl.netloc)
-    purl_domain = get_top_level_domain(purl.netloc)
-    if base_domain != purl_domain:
-        log.debug("extenrnal domain name %r, base domain %r, skip.", purl_domain, base_domain)
-        return False
-
     # Skip all urls restricted by robots.txt
     if robots and not robots.can_fetch('odgovlt', full_url.encode('utf-8')):
         log.debug("%r is restricted by robots.txt", full_url)
@@ -162,7 +154,7 @@ def check_url(base_url, full_url, robots=None, cache=None):
 
 KNOWN_FILE_TYPES = [
     'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx', 'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt',
-    'xla', 'xlw', 'ods'
+    'xla', 'xlw', 'ods', 'tsv', 'sql'
 ]
 
 IGNORE_FILE_TYPES = [
