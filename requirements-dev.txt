@@ -25,6 +25,6 @@ requests-mock==1.4.0
 requests==2.18.4
 rfc6266==0.0.4
 six==1.11.0               # via mock, requests-mock
-sqlalchemy==1.1.14
+sqlalchemy==0.8.7
 unidecode==1.0.22
 urllib3==1.22             # via requests

@@ -25,10 +25,11 @@ from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
 from pylons import config
 from lxml import html
-from cache.cache import Cache
 import requests
 import lxml
 import urlparse
+
+from odgovlt.cache import Cache
 
 requests.packages.urllib3.disable_warnings()
 
@@ -133,16 +134,20 @@ def check_url(base_url, full_url, robots=None, cache=None):
     # Skip unknown protocols
     purl = requests.utils.urlparse(full_url)
     if purl.scheme not in ('http', 'https', ''):
+        log.debug("unknown URL scheme %r, skip.", purl.scheme)
         return False
 
     # Skip all external urls
     base_purl = requests.utils.urlparse(base_url)
     base_domain = get_top_level_domain(base_purl.netloc)
-    if base_domain != getext(purl.netloc):
+    purl_domain = get_top_level_domain(purl.netloc)
+    if base_domain != purl_domain:
+        log.debug("extenrnal domain name %r, base domain %r, skip.", purl_domain, base_domain)
         return False
 
     # Skip all urls restricted by robots.txt
     if robots and not robots.can_fetch('odgovlt', full_url.encode('utf-8')):
+        log.debug("%r is restricted by robots.txt", full_url)
         return False
 
     # Skip cached urls
@@ -231,7 +236,7 @@ def guess_resource_urls(cache, base_url, timeout=20, headers=None, progressbar=p
     try:
         robots.read()
     except IOError:
-        pass
+        robots = None
 
     if not check_url(base_url, base_url, robots):
         return

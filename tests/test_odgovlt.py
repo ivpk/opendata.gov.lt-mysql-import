@@ -37,6 +37,7 @@ from odgovlt import get_package_tags
 from odgovlt import slugify
 from odgovlt import IvpkIrsSync
 from odgovlt import get_web
+from odgovlt.cache import Cache
 
 
 class CKANTestApp(webtest.TestApp):
@@ -79,12 +80,12 @@ def db():
 @pytest.fixture
 def postgres():
     dbname = 'odgovlt_mysql_import_tests'
-    with contextlib.closing(psycopg2.connect('postgresql:///postgres')) as conn:
+    with contextlib.closing(psycopg2.connect('postgresql://ckan:ckan@localhost/postgres')) as conn:
         conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         with contextlib.closing(conn.cursor()) as curs:
             curs.execute('DROP DATABASE IF EXISTS ' + dbname)
             curs.execute('CREATE DATABASE ' + dbname)
-    return 'postgresql:///%s' % dbname
+    return 'postgresql://ckan:ckan@localhost/%s' % dbname
 
 
 @pytest.fixture
@@ -120,6 +121,8 @@ def app(postgres, mocker, caplog):
 
 
 def test_get_web():
+    cache = Cache('sqlite://')
+
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         file1 = '/test1/test1/file1.pdf'
@@ -143,7 +146,7 @@ def test_get_web():
         m.get(url + file4)
         m.get(url + file5)
         m.get(url + file6)
-        response = get_web(url)
+        response = get_web(cache, url)
         assert response == [
             {'website': url, 'is_data': True, 'name': 'file1.pdf',
                 'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
@@ -152,18 +155,19 @@ def test_get_web():
             {'website': url, 'is_data': False, 'name': 'file3.aspx',
                 'url': url + file3, 'cached_forever': True, 'type': 'aspx'},
             {'website': url, 'is_data': False, 'name': u'file4',
-                'url': url + file4, 'cached_forever': False, 'type': 'Unknown extension'},
+                'url': url + file4, 'cached_forever': False, 'type': ''},
             {'website': url, 'is_data': False, 'name': 'file5',
-                'url': url + file5, 'cached_forever': False, 'type': 'Unknown extension'},
+                'url': url + file5, 'cached_forever': False, 'type': ''},
             {'website': url, 'is_data': False, 'name': 'duk.pdf',
                 'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]
+
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'
         m.get(url, text='test')
-        response1 = get_web(url)
-        assert response1 is None
-        response2 = get_web('test')
-        assert response2 is None
+        response1 = get_web(cache, url)
+        assert response1 == []
+        response2 = get_web(cache, 'test')
+        assert response2 == []
 
 
 def test_OdgovltHarvester(app, db, mocker):
@@ -181,6 +185,7 @@ def test_OdgovltHarvester(app, db, mocker):
                      'licencijuojamos veiklos teritorija',
         'K_EMAIL': 'testas1@testas1.com',
         'STATUSAS': 'U',
+        'GALIOJA': 'T',
         'USER_ID': 1,
         'istaiga_id': 1,
     })
@@ -192,6 +197,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'R_ZODZIAI': 'keliai,eismo intensyvumas,"e"',
         'K_EMAIL': 'testas2@testas2.com',
         'STATUSAS': 'U',
+        'GALIOJA': 'T',
         'USER_ID': 2,
         'istaiga_id': 2,
     })
@@ -386,8 +392,13 @@ def test_OdgovltHarvester(app, db, mocker):
     assert was_last_job_considered_error_free()
     ids = ckanapi.package_list()
     assert len(ids) == 3
-    package1 = ckanapi.package_show(id=ids[0])
-    package2 = ckanapi.package_show(id=ids[1])
+
+    packages = {}
+    for id in ids:
+        package = ckanapi.package_show(id=id)
+        packages[package['name']] = package
+
+    package1 = packages['testine-rinkmena-nr-1']
     assert package1['title'] == 'Testinė rinkmena nr. 1'
     assert package1['notes'] == 'Testas nr. 1'
     assert package1['url'] == 'http://www.testas1.lt'
@@ -410,6 +421,8 @@ def test_OdgovltHarvester(app, db, mocker):
             'name': 'testas1-1',
         }
     ]
+
+    package2 = packages['testine-rinkmena-nr-2']
     assert package2['title'] == 'Testinė rinkmena nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
