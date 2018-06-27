@@ -538,11 +538,7 @@ class IvpkIrsSync(object):
             yield self._get_group_name(ivpk_group)
 
     def get_ivpk_datasets(self):
-        query = (
-            sa.select([self.t.rinkmena]).
-            where(self.t.rinkmena.c.STATUSAS == 'U').
-            where(self.t.rinkmena.c.GALIOJA == 'T')
-        )
+        query = sa.select([self.t.rinkmena])
         for ivpk_dataset in self.engine.execute(query):
             yield ivpk_dataset
 
@@ -607,7 +603,7 @@ class OdgovltHarvester(HarvesterBase):
             'maintainer': user['fullname'],
             'maintainer_email': ivpk_dataset['K_EMAIL'],
             'owner_org': organization['name'],
-            'state': 'active',
+            'state': 'active' if ivpk_dataset['STATUSAS'] == 'U' and ivpk_dataset['GALIOJA'] == 'T' else 'deleted',
             'resources': cache_list_to_import,
             'tags': [
                 {'name': tag}
