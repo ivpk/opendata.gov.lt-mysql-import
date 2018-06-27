@@ -153,13 +153,13 @@ def test_get_web():
             {'website': url, 'is_data': True, 'name': 'file2.doc',
                 'url': url + file2, 'cached_forever': False, 'type': 'doc'},
             {'website': url, 'is_data': False, 'name': 'file3.aspx',
-                'url': url + file3, 'cached_forever': True, 'type': 'aspx'},
-            {'website': url, 'is_data': False, 'name': u'file4',
-                'url': url + file4, 'cached_forever': False, 'type': ''},
+                'url': url + file3, 'cached_forever': True, 'type': ''},
+            {'website': url, 'is_data': False, 'name': 'file4',
+                'url': url + file4, 'cached_forever': True, 'type': ''},
             {'website': url, 'is_data': False, 'name': 'file5',
-                'url': url + file5, 'cached_forever': False, 'type': ''},
+                'url': url + file5, 'cached_forever': True, 'type': ''},
             {'website': url, 'is_data': False, 'name': 'duk.pdf',
-                'url': url + file6, 'cached_forever': True, 'type': 'pdf'}]
+                'url': url + file6, 'cached_forever': True, 'type': ''}]
 
     with requests_mock.Mocker() as m:
         url = 'http://test.lt'

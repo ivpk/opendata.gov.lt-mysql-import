@@ -153,13 +153,30 @@ def check_url(base_url, full_url, robots=None, cache=None):
 
 
 KNOWN_FILE_TYPES = [
-    'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'zip', 'csv', 'docx', 'ppt', 'pot', 'pps', 'ppa', 'pptx', 'xlt',
-    'xla', 'xlw', 'ods', 'tsv', 'sql'
+    'docx', 'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'csv', 'pptx', 'ppt', 'pot', 'pps', 'ppa', 'xlt',
+    'xla', 'xlw', 'ods', 'tsv', 'sql', 'zip'
 ]
 
 IGNORE_FILE_TYPES = [
     'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas'
 ]
+
+
+def guess_fileformat(filename):
+    if filename:
+        filetype = getext(filename)
+    else:
+        return ''
+
+    for pattern in IGNORE_FILE_TYPES:
+        if pattern in filename:
+            return ''
+
+    for fileformat in KNOWN_FILE_TYPES:
+        if fileformat in filetype:
+            return fileformat
+
+    return ''
 
 
 def guess_resource(resp, base_url, full_url):
@@ -187,14 +204,13 @@ def guess_resource(resp, base_url, full_url):
         filename = urllib.unquote(basename(purl.path))
 
     # Guess file format from guess filename
-    if filename:
-        filetype = getext(filename)
+    filetype = guess_fileformat(filename)
 
-    if filetype == '':
+    if filename == '':
         is_data = False
         cached_forever = False
 
-    elif any(x in filetype for x in KNOWN_FILE_TYPES) and not any(x in full_url for x in IGNORE_FILE_TYPES):
+    elif filetype:
         is_data = True
         cached_forever = False
 
