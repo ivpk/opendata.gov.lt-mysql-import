@@ -1,10 +1,13 @@
 language: python
 python:
   - "2.7"
+addons:
+  postgresql: "9.3"
 install:
   - pip install flake8 docutils pygments
   - sudo apt-get install solr-jetty openjdk-6-jdk
 before_script:
+  - psql -U postgres -c "CREATE USER ckan WITH SUPERUSER CREATEDB PASSWORD 'ckan';"
   - sudo sed -i 's/NO_START=1/NO_START=0/g' /etc/default/jetty
   - sudo sed -i 's/#JETTY_HOST=$(uname -n)/JETTY_HOST=127.0.0.1/g' /etc/default/jetty
   - sudo sed -i 's/#JETTY_PORT=8080/JETTY_PORT=8983/g' /etc/default/jetty
@@ -12,6 +15,6 @@ before_script:
   - sudo service jetty start
 script:
   - rst2html.py --strict README.rst /dev/null
-  - flake8 --max-line-length=120 odgovlt.py tests
+  - flake8 --max-line-length=120 odgovlt.py tests cache
   - make test
   

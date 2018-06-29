@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
+from os.path import basename
 import collections
 import datetime
 import itertools
@@ -9,6 +10,10 @@ import json
 import logging
 import re
 import string
+import cgi
+import mimetypes
+import robotparser
+import urllib
 
 import sqlalchemy as sa
 import unidecode
@@ -19,6 +24,15 @@ from ckan.plugins import toolkit
 from ckanext.harvest.harvesters.base import HarvesterBase
 from ckanext.harvest.model import HarvestObject
 from pylons import config
+from lxml import html
+import requests
+import lxml
+import urlparse
+
+from odgovlt.cache import Cache
+
+requests.packages.urllib3.disable_warnings()
+
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +40,7 @@ CODE_KEY = 'Kodas'
 ADDRESS_KEY = 'Adresas'
 SOURCE_ID_KEY = 'Šaltinio ID'
 SOURCE_NAME = 'Šaltinis'
+SOURCE_URL = 'Šaltinio nuoroda'
 SOURCE_IVPK_IRS = 'IVPK IRS'
 
 
@@ -92,6 +107,212 @@ def get_package_tags(r_zodziai):
             else:
                 name_list.append(name)
     return name_list
+
+
+def get_top_level_domain(netloc):
+    if '.' in netloc:
+        split = netloc.lower().split('.')
+        return '.'.join(split[-2:])
+    else:
+        return ''
+
+
+def getext(value):
+    parts = value.lower().split('.')
+    if len(parts) <= 1 or parts[0] == '':
+        return ''
+
+    result = []
+    for part in parts[1:][-2:][::-1]:
+        if part and re.match(r'^[a-z0-9]{1,5}$', part) and not part.isdigit():
+            result.append(part)
+        else:
+            break
+    return '.'.join(result[::-1])
+
+
+def check_url(base_url, full_url, robots=None, cache=None):
+    # Skip unknown protocols
+    purl = requests.utils.urlparse(full_url)
+    if purl.scheme not in ('http', 'https', ''):
+        log.debug("unknown URL scheme %r, skip.", purl.scheme)
+        return False
+
+    # Skip all urls restricted by robots.txt
+    if robots and not robots.can_fetch('odgovlt', full_url.encode('utf-8')):
+        log.debug("%r is restricted by robots.txt", full_url)
+        return False
+
+    # Skip cached urls
+    if cache:
+        url_dict = {'website': base_url, 'url': full_url}
+        if url_dict in cache:
+            return False
+
+    return True
+
+
+KNOWN_FILE_TYPES = [
+    'docx', 'pdf', 'doc', 'dot', 'xlsx', 'xls', 'xlt', 'xla', 'csv', 'pptx', 'ppt', 'pot', 'pps', 'ppa', 'xlt',
+    'xla', 'xlw', 'ods', 'tsv', 'sql', 'zip'
+]
+
+IGNORE_FILE_TYPES = [
+    'mailto', 'aspx', 'javascript', 'duk', 'naudotojo_vadovas'
+]
+
+
+def guess_fileformat(filename):
+    if filename:
+        filetype = getext(filename)
+    else:
+        return ''
+
+    for pattern in IGNORE_FILE_TYPES:
+        if pattern in filename:
+            return ''
+
+    for fileformat in KNOWN_FILE_TYPES:
+        if fileformat in filetype:
+            return fileformat
+
+    return ''
+
+
+def guess_resource(resp, base_url, full_url):
+    filename = ''
+    filetype = ''
+    purl = requests.utils.urlparse(full_url)
+    headers = resp.headers
+
+    # Guess filename from content-disposition header
+    disposition = headers.get('content-disposition')
+    if disposition:
+        value, params = cgi.parse_header(disposition)
+        filename = params.get('filename', '')
+
+    # Guess filename from content-type
+    content_type = headers.get('content-type')
+    if not filename and content_type:
+        value, params = cgi.parse_header(content_type)
+        filename = mimetypes.guess_extension(value)
+        if filename:
+            filename = urllib.unquote(basename(purl.path) + filename)
+
+    # Guess filename from url path
+    if not filename:
+        filename = urllib.unquote(basename(purl.path))
+
+    # Guess file format from guess filename
+    filetype = guess_fileformat(filename)
+
+    if filename == '':
+        is_data = False
+        cached_forever = False
+
+    elif filetype:
+        is_data = True
+        cached_forever = False
+
+    else:
+        is_data = False
+        cached_forever = True
+
+    return {
+        'website': base_url,
+        'url': full_url,
+        'name': filename,
+        'type': filetype,
+        'is_data': is_data,
+        'cached_forever': cached_forever,
+    }
+
+
+def progressbar(items):
+    for item in items:
+        yield item
+
+
+def guess_resource_urls(cache, base_url, timeout=20, headers=None, progressbar=progressbar):
+    headers = headers or {'User-Agent': 'odgovlt'}
+    session = requests.Session()
+    session.headers.update(headers)
+    session.timeout = timeout
+    session.verify = False
+
+    base_purl = requests.utils.urlparse(base_url)
+    robots = robotparser.RobotFileParser(base_purl.scheme + '://' + base_purl.netloc + '/robots.txt')
+    try:
+        robots.read()
+    except IOError:
+        robots = None
+
+    if not check_url(base_url, base_url, robots):
+        return
+
+    try:
+        resp = session.get(base_url)
+
+        parser = lxml.html.HTMLParser(encoding='utf-8')
+        tree = lxml.html.document_fromstring(resp.text, parser=parser)
+        tree.make_links_absolute(base_url)
+    except (requests.exceptions.InvalidSchema,
+            requests.exceptions.MissingSchema,
+            requests.exceptions.ConnectionError,
+            lxml.etree.ParserError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ReadTimeout,
+            requests.exceptions.InvalidURL,
+            AttributeError,
+            IOError) as e:
+        log.warning("error while fetching and parsing base url: %s", e)
+        return
+
+    content_type = resp.headers.get('content-type')
+    if content_type and not content_type.startswith(('text/html', 'text/xhtml')):
+        # If base url itself is not an html page, then it might be a resource.
+        yield guess_resource(resp, base_url, base_url)
+        return
+
+    # Visit all links found in base url and look for possible resource links.
+    for href in progressbar(tree.xpath('//@href')):
+        full_url = urlparse.urljoin(base_url, href).decode('utf-8')
+
+        if not check_url(base_url, full_url, robots, cache):
+            continue
+
+        resp = None
+        try:
+            resp = session.get(full_url, stream=True)
+
+        except (requests.exceptions.InvalidSchema,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ReadTimeout,
+                requests.exceptions.InvalidURL,
+                NameError, UnboundLocalError, AttributeError, IOError) as e:
+            log.warning("error while fetching and parsing page url: %s", e)
+
+        else:
+            yield guess_resource(resp, base_url, full_url)
+
+        finally:
+            if resp:
+                resp.close()
+
+
+def get_web(cache, base_url, timeout=20, headers=None, progressbar=progressbar):
+    return [
+        data for data in guess_resource_urls(cache, base_url, timeout, headers, progressbar)
+    ]
+
+
+def make_cache(cache, url):
+    for cache_dict in get_web(cache, url):
+        try:
+            cache.update(cache_dict)
+        except KeyError as e:
+            log.error(e)
 
 
 class CkanAPI(object):
@@ -334,12 +555,23 @@ class IvpkIrsSync(object):
             yield self._get_group_name(ivpk_group)
 
     def get_ivpk_datasets(self):
-        query = (
-            sa.select([self.t.rinkmena]).
-            where(self.t.rinkmena.c.STATUSAS == 'U')
-        )
+        query = sa.select([self.t.rinkmena])
         for ivpk_dataset in self.engine.execute(query):
             yield ivpk_dataset
+
+
+_cache = None
+
+
+def get_cache_manager():
+    global _cache
+
+    if _cache is None:
+        cache_db_file = 'sqlite:///%s/odgovlt.cache.db' % config.get('cache_dir', '/tmp')
+        log.info('odgovlt cache dir: %s', cache_db_file)
+        _cache = Cache(cache_db_file)
+
+    return _cache
 
 
 class OdgovltHarvester(HarvesterBase):
@@ -380,6 +612,14 @@ class OdgovltHarvester(HarvesterBase):
         organization = sync.sync_organization(ivpk_dataset['istaiga_id'])
         sync.api.organization_member_create(id=organization['name'], username=user['name'], role='editor')
 
+        cache = get_cache_manager()
+        make_cache(cache, ivpk_dataset['TINKLAPIS'])
+        cache_list_to_import = []
+        for cache_data in cache.get_url_data(ivpk_dataset['TINKLAPIS']):
+            cache_list_to_import.append(
+                {'url': cache_data['url'],
+                 'name': cache_data['name'],
+                 'format': cache_data['type']})
         package_dict = {
             'id': harvest_object.guid,
             'name': slugify(ivpk_dataset['PAVADINIMAS'], length=42),
@@ -389,7 +629,8 @@ class OdgovltHarvester(HarvesterBase):
             'maintainer': user['fullname'],
             'maintainer_email': ivpk_dataset['K_EMAIL'],
             'owner_org': organization['name'],
-            'state': 'active',
+            'state': 'active' if ivpk_dataset['STATUSAS'] == 'U' and ivpk_dataset['GALIOJA'] == 'T' else 'deleted',
+            'resources': cache_list_to_import,
             'tags': [
                 {'name': tag}
                 for tag in get_package_tags(ivpk_dataset['R_ZODZIAI'])
@@ -401,6 +642,7 @@ class OdgovltHarvester(HarvesterBase):
             'extras': [
                 {'key': SOURCE_NAME, 'value': SOURCE_IVPK_IRS},
                 {'key': SOURCE_ID_KEY, 'value': ivpk_dataset['ID']},
+                {'key': SOURCE_URL, 'value': 'http://opendata.gov.lt/index.php?vars=/public/public/print/%s/' % ivpk_dataset['ID']},
                 {'key': CODE_KEY, 'value': ivpk_dataset['KODAS']},
             ],
         }

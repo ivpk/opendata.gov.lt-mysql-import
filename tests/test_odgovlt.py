@@ -9,6 +9,7 @@ import logging
 import os
 
 import mock
+import requests_mock
 import pkg_resources as pres
 import psycopg2
 import psycopg2.extensions
@@ -35,6 +36,8 @@ from odgovlt import fixcase
 from odgovlt import get_package_tags
 from odgovlt import slugify
 from odgovlt import IvpkIrsSync
+from odgovlt import get_web
+from odgovlt.cache import Cache
 
 
 class CKANTestApp(webtest.TestApp):
@@ -77,12 +80,12 @@ def db():
 @pytest.fixture
 def postgres():
     dbname = 'odgovlt_mysql_import_tests'
-    with contextlib.closing(psycopg2.connect('postgresql:///postgres')) as conn:
+    with contextlib.closing(psycopg2.connect('postgresql://ckan:ckan@localhost/postgres')) as conn:
         conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         with contextlib.closing(conn.cursor()) as curs:
             curs.execute('DROP DATABASE IF EXISTS ' + dbname)
             curs.execute('CREATE DATABASE ' + dbname)
-    return 'postgresql:///%s' % dbname
+    return 'postgresql://ckan:ckan@localhost/%s' % dbname
 
 
 @pytest.fixture
@@ -117,6 +120,56 @@ def app(postgres, mocker, caplog):
     return app
 
 
+def test_get_web():
+    cache = Cache('sqlite://')
+
+    with requests_mock.Mocker() as m:
+        url = 'http://test.lt'
+        file1 = '/test1/test1/file1.pdf'
+        file2 = '/test2/test2/file2.doc'
+        file3 = '/test3/test3/file3.aspx'
+        file4 = '/test4/test4/file4'
+        file5 = '/file5'
+        file6 = '/duk.pdf'
+        href1 = '<a href="%s" target="_blank"></a>' % file1
+        href2 = '<a href="%s" target="_blank"></a>' % file2
+        href3 = '<a href="%s" target="_blank"></a>' % file3
+        href4 = '<a href="%s" target="_blank"></a>' % file4
+        href5 = '<a href="%s" target="_blank"></a>' % file5
+        href6 = '<a href="%s" target="_blank"></a>' % file6
+        page = 'test1 test2 test3' + href1 + 'test' + href2 + href3 + href4 + href5 + \
+            'test4 test5 test6' + href6
+        m.get(url, text=page, headers={'content-type': 'text/html'})
+        m.get(url + file1)
+        m.get(url + file2)
+        m.get(url + file3)
+        m.get(url + file4)
+        m.get(url + file5)
+        m.get(url + file6)
+        response = get_web(cache, url)
+        assert response == [
+            {'website': url, 'is_data': True, 'name': 'file1.pdf',
+                'url': url + file1, 'cached_forever': False, 'type': 'pdf'},
+            {'website': url, 'is_data': True, 'name': 'file2.doc',
+                'url': url + file2, 'cached_forever': False, 'type': 'doc'},
+            {'website': url, 'is_data': False, 'name': 'file3.aspx',
+                'url': url + file3, 'cached_forever': True, 'type': ''},
+            {'website': url, 'is_data': False, 'name': 'file4',
+                'url': url + file4, 'cached_forever': True, 'type': ''},
+            {'website': url, 'is_data': False, 'name': 'file5',
+                'url': url + file5, 'cached_forever': True, 'type': ''},
+            {'website': url, 'is_data': False, 'name': 'duk.pdf',
+                'url': url + file6, 'cached_forever': True, 'type': ''}]
+
+    with requests_mock.Mocker() as m:
+        url = 'http://test.lt'
+        m.get(url, text='test')
+        response1 = get_web(cache, url)
+        assert response1 == []
+        response2 = get_web(cache, 'test')
+        assert response2 == []
+
+
 def test_OdgovltHarvester(app, db, mocker):
     sync = IvpkIrsSync(db)
     mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
@@ -132,6 +185,7 @@ def test_OdgovltHarvester(app, db, mocker):
                      'licencijuojamos veiklos teritorija',
         'K_EMAIL': 'testas1@testas1.com',
         'STATUSAS': 'U',
+        'GALIOJA': 'T',
         'USER_ID': 1,
         'istaiga_id': 1,
     })
@@ -143,6 +197,7 @@ def test_OdgovltHarvester(app, db, mocker):
         'R_ZODZIAI': 'keliai,eismo intensyvumas,"e"',
         'K_EMAIL': 'testas2@testas2.com',
         'STATUSAS': 'U',
+        'GALIOJA': 'T',
         'USER_ID': 2,
         'istaiga_id': 2,
     })
@@ -311,7 +366,21 @@ def test_OdgovltHarvester(app, db, mocker):
     reset_db()
     sync = IvpkIrsSync(db)
     mocker.patch('odgovlt.IvpkIrsSync', return_value=sync)
-    results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
+    with requests_mock.Mocker(real_http=True) as m:
+        url1 = 'http://www.testas1.lt'
+        url2 = 'http://www.testas2.lt'
+        file1 = '/test1/test1/file1.pdf'
+        file2 = '/test2/test2/file2.doc'
+        href1 = '<a href="%s" target="_blank"></a>' % file1
+        href2 = '<a href="%s" target="_blank"></a>' % file2
+        page = href1 + href2
+        m.get(url1, text=page, headers={'content-type': 'text/html'})
+        m.get(url2, text=page, headers={'content-type': 'text/html'})
+        m.get(url1 + file1, text=page)
+        m.get(url1 + file2, text=page)
+        m.get(url2 + file1, text=page)
+        m.get(url2 + file2, text=page)
+        results_by_guid = run_harvest(url='sqlite://', harvester=OdgovltHarvester())
     result = results_by_guid['1']
     assert result['state'] == 'COMPLETE'
     assert result['report_status'] == 'added'
@@ -323,13 +392,24 @@ def test_OdgovltHarvester(app, db, mocker):
     assert was_last_job_considered_error_free()
     ids = ckanapi.package_list()
     assert len(ids) == 3
-    package1 = ckanapi.package_show(id=ids[0])
-    package2 = ckanapi.package_show(id=ids[1])
+
+    packages = {}
+    for id in ids:
+        package = ckanapi.package_show(id=id)
+        packages[package['name']] = package
+
+    package1 = packages['testine-rinkmena-nr-1']
     assert package1['title'] == 'Testinė rinkmena nr. 1'
     assert package1['notes'] == 'Testas nr. 1'
     assert package1['url'] == 'http://www.testas1.lt'
     assert package1['maintainer'] == 'Jonas Jonaitis'
     assert package1['maintainer_email'] == 'testas1@testas1.com'
+    assert package1['resources'][0]['name'] == 'file1.pdf'
+    assert package1['resources'][0]['format'] == 'PDF'
+    assert package1['resources'][0]['url'] == 'http://www.testas1.lt/test1/test1/file1.pdf'
+    assert package1['resources'][1]['name'] == 'file2.doc'
+    assert package1['resources'][1]['format'] == 'DOC'
+    assert package1['resources'][1]['url'] == 'http://www.testas1.lt/test2/test2/file2.doc'
     assert package1['organization']['title'] == 'Testinė organizacija nr. 1'
     assert package1['groups'] == [
         {
@@ -341,11 +421,19 @@ def test_OdgovltHarvester(app, db, mocker):
             'name': 'testas1-1',
         }
     ]
+
+    package2 = packages['testine-rinkmena-nr-2']
     assert package2['title'] == 'Testinė rinkmena nr. 2'
     assert package2['notes'] == 'Testas nr. 2'
     assert package2['url'] == 'http://www.testas2.lt'
     assert package2['maintainer'] == 'Tomas Tomauskas'
     assert package2['maintainer_email'] == 'testas2@testas2.com'
+    assert package2['resources'][0]['name'] == 'file1.pdf'
+    assert package2['resources'][0]['format'] == 'PDF'
+    assert package2['resources'][0]['url'] == 'http://www.testas2.lt/test1/test1/file1.pdf'
+    assert package2['resources'][1]['name'] == 'file2.doc'
+    assert package2['resources'][1]['format'] == 'DOC'
+    assert package2['resources'][1]['url'] == 'http://www.testas2.lt/test2/test2/file2.doc'
     assert package2['organization']['title'] == 'Testinė organizacija nr. 2'
     assert package2['groups'] == [
         {
