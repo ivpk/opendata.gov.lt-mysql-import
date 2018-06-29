@@ -252,7 +252,10 @@ def guess_resource_urls(cache, base_url, timeout=20, headers=None, progressbar=p
 
     try:
         resp = session.get(base_url)
-        tree = html.fromstring(resp.content)
+
+        parser = lxml.html.HTMLParser(encoding='utf-8')
+        tree = lxml.html.document_fromstring(resp.text, parser=parser)
+        tree.make_links_absolute(base_url)
     except (requests.exceptions.InvalidSchema,
             requests.exceptions.MissingSchema,
             requests.exceptions.ConnectionError,
@@ -273,7 +276,7 @@ def guess_resource_urls(cache, base_url, timeout=20, headers=None, progressbar=p
 
     # Visit all links found in base url and look for possible resource links.
     for href in progressbar(tree.xpath('//@href')):
-        full_url = urlparse.urljoin(base_url, href)
+        full_url = urlparse.urljoin(base_url, href).decode('utf-8')
 
         if not check_url(base_url, full_url, robots, cache):
             continue
